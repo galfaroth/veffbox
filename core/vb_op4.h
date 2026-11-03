@@ -18,5 +18,7 @@ enum { VB_OP4_WAVE, VB_OP4_CRS, VB_OP4_FINE, VB_OP4_LVL, VB_OP4_ATK, VB_OP4_DEC,
 #define VB_OP4_ALGS 11
 
 extern const vb_engine_t vb_op4;
+/* the routings: modulation edges "from to" separated by spaces, and the carriers (the screen draws them too) */
+extern const char *const vb_op4_alg_edges[VB_OP4_ALGS], *const vb_op4_alg_carriers[VB_OP4_ALGS];
 
 #endif

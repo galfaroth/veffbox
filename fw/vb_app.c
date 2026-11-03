@@ -1650,6 +1650,64 @@ static void text_fit(int32_t x, int32_t w, int32_t y, uint32_t sc, const char *s
     text_c(x, w, y + (int32_t)(want - sc) * 5 / 2, sc, s, c);
 }
 
+/* ---- rounded shapes, as the mockup draws them (a radius in px; the corners per row) */
+static int32_t isqrt(int32_t v)
+{
+    int32_t r = 0;
+    while ((r + 1) * (r + 1) <= v)
+        r++;
+    return r;
+}
+static int32_t corner_in(int32_t r, int32_t j)                 /* how far row j (0 = the edge) of a corner is inset */
+{
+    int32_t d = 2 * r - 2 * j - 1;
+    return (2 * r - isqrt(4 * r * r - d * d) + 1) / 2;
+}
+static void rfill(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t c)
+{
+    int32_t j;
+    if (r > h / 2)
+        r = h / 2;
+    if (r > w / 2)
+        r = w / 2;
+    for (j = 0; j < r; j++) {
+        int32_t in = corner_in(r, j);
+        cv_rect(x + in, y + j, w - 2 * in, 1, c);
+        cv_rect(x + in, y + h - 1 - j, w - 2 * in, 1, c);
+    }
+    cv_rect(x, y + r, w, h - 2 * r, c);
+}
+/* a rounded box: a t px border in ink, filled with fill */
+static void rbox(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, int32_t t, uint16_t ink, uint16_t fill)
+{
+    rfill(x, y, w, h, r, ink);
+    rfill(x + t, y + t, w - 2 * t, h - 2 * t, r > t ? r - t : 1, fill);
+}
+static void line2(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c)   /* 2 px */
+{
+    cv_line(x0, y0, x1, y1, c);
+    cv_line(x0 + 1, y0, x1 + 1, y1, c);
+    cv_line(x0, y0 + 1, x1, y1 + 1, c);
+}
+static void disc(int32_t cx, int32_t cy, int32_t r, uint16_t c)
+{
+    int32_t dy;
+    for (dy = -r; dy <= r; dy++) {
+        int32_t dx = isqrt(r * r - dy * dy);
+        cv_rect(cx - dx, cy + dy, 2 * dx + 1, 1, c);
+    }
+}
+/* an ADSR as a 2 px line in a w x h box: attack, decay, a quarter of sustain, release */
+static void adsr(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t a, uint32_t d, uint32_t su, uint32_t rl)
+{
+    int32_t q = w / 4, xa = x + (int32_t)a * q / 127, xd = xa + (int32_t)d * q / 127, ys = y + h - 1 - (int32_t)su * (h - 2) / 127;
+    int32_t xs = xd + q, xr = xs + (int32_t)rl * q / 127;
+    line2(x, y + h - 2, xa, y, C_INK);
+    line2(xa, y, xd, ys, C_INK);
+    line2(xd, ys, xs, ys, C_INK);
+    line2(xs, ys, xr, y + h - 2, C_INK);
+}
+
 static void draw_hdr(void)
 {
     char t[24];
@@ -1693,11 +1751,9 @@ static void chips(const char *const *names, uint32_t n, uint32_t sel, uint32_t l
     for (i = 0; i < n; i++) {
         int32_t x = 4 + (int32_t)(i * w);
         int s = i == sel;
-        cv_rect(x, 3, (int32_t)w - 3, 22, C_INK);          /* 22 high: the 2x text (10 px) in the middle */
-        if (!s)
-            cv_rect(x + 2, 5, (int32_t)w - 7, 18, C_BG);
+        rbox(x, 3, (int32_t)w - 3, 22, 4, 2, C_INK, s ? C_INK : C_BG);   /* 22 high: the 2x text (10 px) in the middle */
         if (!s && ((lit_mask >> i) & 1u))
-            cv_rect(x + 2, 21, (int32_t)w - 7, 2, C_INK);
+            cv_rect(x + 3, 19, (int32_t)w - 9, 3, C_INK);
         text_fit(x, (int32_t)w - 3, 9, 2, names[i], s ? C_BG : C_INK);
     }
 }
@@ -1777,34 +1833,66 @@ static void vis_print(void)
     text_c(0, 240, 108, 2, t, C_INK);
 }
 
+/* where each operator sits in the drawing of each algorithm: column << 4 | row, for A B C D (the mockup's ALG) */
+static const uint8_t ALG_POS[VB_OP4_ALGS][4] = {
+    {0x13, 0x12, 0x11, 0x10}, {0x13, 0x12, 0x01, 0x21}, {0x13, 0x22, 0x02, 0x01}, {0x13, 0x22, 0x02, 0x21},
+    {0x23, 0x03, 0x02, 0x01}, {0x23, 0x22, 0x03, 0x02}, {0x03, 0x13, 0x23, 0x12}, {0x13, 0x23, 0x03, 0x02},
+    {0x13, 0x02, 0x12, 0x22}, {0x03, 0x23, 0x12, 0x11}, {0x03, 0x13, 0x23, 0x33},
+};
+#define OPX(o) (8 + (int32_t)(ALG_POS[alg][o] >> 4) * 27)
+#define OPY(o) (4 + (int32_t)(ALG_POS[alg][o] & 15u) * 26)
 static void vis_op4(void)
 {
-    /* the algorithm as text and the selected operator, large */
     char t[24];
-    uint32_t op = ui.opsel & 3u;
-    const uint8_t *o = &RC->op4[op * 9u];
+    uint32_t op = ui.opsel & 3u, alg = RC->op4[VB_OP4_ALG] % VB_OP4_ALGS, i;
+    const uint8_t *o = &RC->op4[op * VB_OP4_PER_OP];
+    const char *e;
     static const char *const OPL[4] = {"A", "B", "C", "D"};
-    static const char *const ALG_TXT[11] = {"D>C>B>A", "C+D>B>A", "D>C>A B>A", "D>B>A C>A", "D>C>B  A", "D>C  B>A",
-                                            "D>A,B,C", "D>C  A  B", "B+C+D>A", "D>C>A,B", "A B C D"};
-    chips(OPL, 4, op, 0);
-    md_text(12, 34, &MD_F3, 9, OPL[op], C_INK);
-    str_cpy(t, vb_op4.desc.params[op * 9u].names ? vb_op4.desc.params[op * 9u].names[o[0]] : "SIN", sizeof t);
-    md_text(84, 36, &MD_F3, 3, t, C_INK);
-    str_cpy(t, "X", sizeof t);
-    if (o[8]) {
+    for (e = vb_op4_alg_edges[alg]; e[0] && e[1]; e += e[2] ? 3 : 2) {   /* modulator -> target */
+        uint32_t f = (uint32_t)(e[0] - 'A'), g = (uint32_t)(e[1] - 'A');
+        line2(OPX(f) + 9, OPY(f) + 20, OPX(g) + 9, OPY(g), C_INK);
+    }
+    for (e = vb_op4_alg_carriers[alg]; *e; e++) {                       /* carriers -> the output */
+        uint32_t c = (uint32_t)(*e - 'A');
+        cv_rect(OPX(c) + 9, OPY(c) + 20, 2, 113 - OPY(c) - 20, C_INK);
+    }
+    cv_rect(4, 113, 104, 4, C_INK);
+    {   /* the feedback loop on D */
+        int32_t dx = OPX(3), dy = OPY(3);
+        cv_rect(dx + 20, dy + 6, 6, 2, C_INK);
+        cv_rect(dx + 24, dy - 4, 2, 12, C_INK);
+        cv_rect(dx + 10, dy - 4, 16, 2, C_INK);
+        cv_rect(dx + 10, dy - 4, 2, 4, C_INK);
+    }
+    for (i = 0; i < 4u; i++) {
+        int s = i == op;
+        rbox(OPX(i), OPY(i), 20, 20, 3, 2, C_INK, s ? C_INK : C_BG);
+        text_c(OPX(i), 20, OPY(i) + 5, 2, OPL[i], s ? C_BG : C_INK);
+    }
+    md_text(120, 4, &MD_F3, 9, OPL[op], C_INK);
+    str_cpy(t, "ALG ", sizeof t);
+    utoa10(t + 4, alg + 1u);
+    md_text(120 + (int32_t)md_text_w(&MD_F3, 9, OPL[op]) + 8, 34, &MD_F3, 2, t, C_INK);
+    str_cpy(t, vb_op4.desc.params[op * VB_OP4_PER_OP].names ? vb_op4.desc.params[op * VB_OP4_PER_OP].names[o[0]] : "SIN", sizeof t);
+    md_text(120, 56, &MD_F3, 3, t, C_INK);
+    if (o[VB_OP4_FIX]) {
         utoa10(t, (uint32_t)(o[1] * 100 + o[2] * 10));
         cat(t, "HZ", sizeof t);
-    } else if (!o[1]) {
-        str_cpy(t, "X0.5", sizeof t);
-    } else {
-        utoa10(t + 1, o[1]);
+    } else {                                                            /* the ratio: CRS (0 = 0.5) + FINE / 100 */
+        uint32_t r100 = (o[1] ? o[1] * 100u : 50u) + o[2];
+        str_cpy(t, "X", sizeof t);
+        utoa10(t + 1, r100 / 100u);
+        cat(t, ".", sizeof t);
+        t[str_len(t) + 1] = 0;
+        t[str_len(t)] = (char)('0' + r100 / 10u % 10u);
+        t[str_len(t) + 1] = 0;
+        t[str_len(t)] = (char)('0' + r100 % 10u);
     }
-    md_text(84, 60, &MD_F3, 3, t, C_INK);
-    str_cpy(t, "ALG ", sizeof t);
-    utoa10(t + 4, RC->op4[36] + 1u);
-    md_text(12, 94, &MD_F3, 2, t, C_INK);
-    md_text(84, 94, &MD_F3, 2, ALG_TXT[RC->op4[36] % 11u], C_INK);
+    md_text(120, 78, &MD_F3, 3, t, C_INK);
+    adsr(120, 98, 112, 22, o[VB_OP4_ATK], o[VB_OP4_DEC], o[VB_OP4_SUS], o[VB_OP4_REL]);
 }
+#undef OPX
+#undef OPY
 
 static void vis_anlg(void)
 {
@@ -1837,9 +1925,7 @@ static void vis_play(void)
             const vb_chord_t *ch = &pl->chord[i];
             uint32_t w = vb_len16[ch->len_i % 12u] * 232u / (tot ? tot : 1u);
             int s = i == pl->sel, play = vb_pl.playing && vb_pl.step == i;
-            cv_rect((int32_t)x, 6, (int32_t)w - 2, 40, C_INK);
-            if (!play)
-                cv_rect((int32_t)x + (s ? 3 : 1), s ? 9 : 7, (int32_t)w - (s ? 8 : 4), s ? 34 : 38, C_BG);
+            rbox((int32_t)x, 6, (int32_t)w - 2, 40, 4, s ? 4 : 2, C_INK, play ? C_INK : C_BG);
             if (w > 30u) {
                 vb_chord_name(ch, t, 8);
                 text_fit((int32_t)x, (int32_t)w - 2, 20, 2, t, play ? C_BG : C_INK);
@@ -1886,9 +1972,7 @@ static void vis_play(void)
             const vb_step_t *st = &pl->seq[i];
             int32_t x = 4 + (int32_t)(i % 8u) * 29, y = 8 + (int32_t)(i / 8u) * 40;
             int s = i == pl->sel, play = vb_pl.playing && vb_pl.step == i;
-            cv_rect(x, y, 27, 34, C_INK);
-            if (!play)
-                cv_rect(x + (s ? 3 : 1), y + (s ? 3 : 1), s ? 21 : 25, s ? 28 : 32, C_BG);
+            rbox(x, y, 27, 34, 4, s ? 4 : 2, C_INK, play ? C_INK : C_BG);
             if (st->on && i < pl->len)
                 text_fit(x, 27, y + 12, 2, NOTE_NM[st->note % 12], play ? C_BG : C_INK);
         }
@@ -1900,39 +1984,90 @@ static void vis_play(void)
     }
 }
 
+static int32_t lfo_shape(uint32_t wave, uint32_t ph)              /* Q15, as core/vb_mod.c draws a cycle */
+{
+    int32_t x = (int32_t)(ph >> 16);
+    switch (wave) {
+    case VB_LFO_SIN: return vb_sin(ph);
+    case VB_LFO_TRI: return x < 32768 ? -32767 + x * 2 : 32767 - (x - 32768) * 2;
+    case VB_LFO_SQR: return ph < 0x80000000u ? 32767 : -32767;
+    case VB_LFO_SAW: return 32767 - x;
+    case VB_LFO_RAMP: return x - 32767;
+    case VB_LFO_SH: { uint32_t k = ph >> 29; return (int32_t)((k * 9301u + 49297u) % 233280u * 65534u / 233280u) - 32767; }
+    default: { int32_t e = 32767 - (int32_t)(ph >> 17), cube = ((e * e) >> 15) * e >> 15; return cube * 2 - 32767; }
+    }
+}
+#define MOD_CY 55                                                       /* the curve's middle line */
 static void vis_mod(void)
 {
     static const char *const MS[9] = {"L1", "L2", "L3", "L4", "L5", "L6", "E1", "E2", "E3"};
-    uint32_t i, lit = 0, k;
-    const vb_modsrc_t *m = &RC->mod[ui.op % VB_MODSRC];
-    char t[24];
+    uint32_t i, lit = 0, k, src = ui.op % VB_MODSRC;
+    const vb_modsrc_t *m = &RC->mod[src];
+    char t[32];
     for (i = 0; i < VB_MODSRC; i++)
         for (k = 0; k < VB_ROUTES; k++)
             if (RC->mod[i].r[k].dest != VB_ADDR_NONE && RC->mod[i].r[k].amt)
                 lit |= 1u << i;
-    chips(MS, 9, ui.op % VB_MODSRC, lit);
+    chips(MS, 9, src, lit);
     str_cpy(t, m->kind ? "ENV " : "LFO ", sizeof t);
-    utoa10(t + 4, m->kind ? ui.op - 5u : ui.op + 1u);
+    utoa10(t + 4, m->kind ? src - 5u : src + 1u);
     md_text(8, 30, &MD_F3, 3, t, C_INK);
-    if (!m->kind)
-        md_text(120, 33, &MD_F3, 2, LFOW_N[m->wave % 7u], C_INK);
+    if (!m->kind) {                                                     /* SIN 1/4 FREE */
+        char v[12];
+        str_cpy(t, LFOW_N[m->wave % 7u], sizeof t);
+        cat(t, " ", sizeof t);
+        cell_text(&C[0][1], v);
+        cat(t, v, sizeof t);
+        cat(t, " ", sizeof t);
+        cat(t, TRIG_N[m->trig % 5u], sizeof t);
+    } else {
+        str_cpy(t, "ADSR ", sizeof t);
+        cat(t, ELOOP_N[m->loop % 3u], sizeof t);
+    }
+    {
+        uint32_t sc = md_text_w(&MD_F3, 2, t) > 130 ? 1u : 2u;
+        md_text(232 - (int32_t)md_text_w(&MD_F3, sc, t), sc == 2u ? 33 : 35, &MD_F3, sc, t, C_INK);
+    }
+    if (!m->kind) {                                                     /* one cycle, and where the LFO is now */
+        int32_t px = 0, py = 0, x;
+        for (x = 0; x <= 220; x += 2) {
+            int32_t y = MOD_CY - lfo_shape(m->wave, (uint32_t)x * 19522579u) * 8 / 32768;
+            if (x)
+                line2(10 + px, py, 10 + x, y, C_INK);
+            px = x;
+            py = y;
+        }
+        if (src < 6u) {
+            uint32_t ph = vb_pl.lfo[src].ph;
+            int32_t cx = 10 + (int32_t)((ph >> 24) * 220u / 256u), cy = MOD_CY - lfo_shape(m->wave, ph) * 8 / 32768;
+            disc(cx, cy, 5, C_INK);
+            disc(cx, cy, 3, C_BG);
+        }
+    } else {
+        adsr(10, MOD_CY - 9, 220, 19, m->atk, m->dec, m->sus, m->rel);
+    }
     for (k = 0; k < VB_ROUTES; k++) {
-        int32_t y = 52 + (int32_t)k * 17, w;
-        int lrn = ui.learn_src == (int)(ui.op % VB_MODSRC) && ui.learn_slot == (int)k;
+        int32_t y = 70 + (int32_t)k * 13, w;
+        int lrn = ui.learn_src == (int)src && ui.learn_slot == (int)k;
+        if (lrn)
+            rfill(4, y - 2, 232, 13, 3, C_INK);
         t[0] = (char)('1' + k);
         t[1] = 0;
-        md_text(8, y, &MD_F3, 2, t, C_INK);
+        md_text(8, y, &MD_F3, 2, t, lrn ? C_BG : C_INK);
         if (lrn)
             str_cpy(t, "TURN A KNOB", sizeof t);
         else
             vb_addr_name(RC, m->r[k].dest, t, 16);
-        md_text(26, y, &MD_F3, 2, t, C_INK);
-        cv_frame(160, y, 70, 10, C_INK);
-        w = m->r[k].dest == VB_ADDR_NONE ? 0 : m->r[k].amt * 34 / 64;
+        md_text(24, y, &MD_F3, 2, t, lrn ? C_BG : C_INK);
+        if (lrn)
+            continue;
+        rbox(162, y, 68, 10, 5, 2, C_INK, C_BG);                       /* a pill: the amount from its middle */
+        w = m->r[k].dest == VB_ADDR_NONE ? 0 : m->r[k].amt * 31 / 64;
         if (w > 0)
-            cv_rect(195, y + 2, w, 6, C_INK);
+            cv_rect(196, y + 2, w, 6, C_INK);
         else if (w < 0)
-            cv_rect(195 + w, y + 2, -w, 6, C_INK);
+            cv_rect(196 + w, y + 2, -w, 6, C_INK);
+        cv_rect(195, y + 1, 2, 8, C_INK);
     }
 }
 
@@ -1985,8 +2120,8 @@ static void vis_print_page(void)
     md_text(112, 30, &MD_F3, 2, "NEXT", C_INK);
     md_text(112, 46, &MD_F3, 5, t, C_INK);
     if (vb_pl.rec && vb_pl.rec_target) {
-        cv_frame(112, 92, 118, 12, C_INK);
-        cv_rect(114, 94, (int32_t)(vb_pl.rec_pos * 114u / vb_pl.rec_target), 8, C_INK);
+        rbox(112, 92, 118, 12, 6, 2, C_INK, C_BG);
+        rfill(114, 94, 4 + (int32_t)(vb_pl.rec_pos * 110u / vb_pl.rec_target), 8, 4, C_INK);
     } else {
         md_text(112, 96, &MD_F3, 2, "REC ANYWHERE", C_INK);
     }
@@ -2004,7 +2139,7 @@ static void vis_songs(void)
         int s = i == ui.song;
         vb_song_t *g = &vb_song;                            /* (the song buffer: only used here and in LOAD / SAVE) */
         if (s)
-            cv_rect(4, y - 3, 232, 17, C_INK);
+            rfill(4, y - 3, 232, 17, 4, C_INK);
         str_cpy(t, "S", sizeof t);
         utoa10(t + 1, i + 1u);
         cat(t, i < 9u ? "  " : " ", sizeof t);
@@ -2042,7 +2177,7 @@ static void vis_bank(void)
         int32_t y = 30 + (int32_t)(i - first) * 18;
         int s = i == vb_curgen;
         if (s)
-            cv_rect(4, y - 3, 232, 16, C_INK);
+            rfill(4, y - 3, 232, 16, 4, C_INK);
         str_cpy(t, "G", sizeof t);
         utoa10(t + 1, i + 1u);
         cat(t, " ", sizeof t);
@@ -2155,5 +2290,10 @@ static void vb_draw(void)
     } else if (ui.d_vis && (int32_t)(fm1_ms - ui.vis_due) >= 0) {
         ui.d_vis = 0;
         draw_vis();
+    } else if (ui.page == PG_MOD && ui.op < 6u && fm1_ms - anim > 50u) {   /* the LFO's dot: its strip only */
+        anim = fm1_ms;
+        cv_begin_win(0, MOD_CY - 10, 240, 21, 40, C_BG);
+        vis_mod();
+        cv_blit(0, 40);
     }
 }

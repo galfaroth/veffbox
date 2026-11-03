@@ -27,10 +27,10 @@ static const vb_param_t params[VB_OP4_FB + 1] = {
 #undef M
 
 /* The mockup's ALG table, verbatim (ui/index.html `const ALG=[`): modulation edges "from to", then the carriers. */
-static const char *const ALG_EDGES[VB_OP4_ALGS] = {
+const char *const vb_op4_alg_edges[VB_OP4_ALGS] = {
     "DC CB BA", "CB DB BA", "DC CA BA", "DB BA CA", "DC CB", "DC BA", "DA DB DC", "DC", "BA CA DA", "DC CA CB", "",
 };
-static const char *const ALG_CARRIERS[VB_OP4_ALGS] = {
+const char *const vb_op4_alg_carriers[VB_OP4_ALGS] = {
     "A", "A", "A", "A", "BA", "CA", "ABC", "CAB", "A", "AB", "ABCD",
 };
 
@@ -144,8 +144,8 @@ static int op4_render(void *voice, const uint8_t *patch, int32_t *out, int n)
     }
     const int alg = imin(patch[VB_OP4_ALG], VB_OP4_ALGS - 1);
     unsigned src[4] = { 0, 0, 0, 0 }, car = 0;
-    for (const char *e = ALG_EDGES[alg]; e[0] && e[1]; e += e[2] ? 3 : 2) src[e[1] - 'A'] |= 1u << (e[0] - 'A');
-    for (const char *c = ALG_CARRIERS[alg]; *c; c++) car |= 1u << (*c - 'A');
+    for (const char *e = vb_op4_alg_edges[alg]; e[0] && e[1]; e += e[2] ? 3 : 2) src[e[1] - 'A'] |= 1u << (e[0] - 'A');
+    for (const char *c = vb_op4_alg_carriers[alg]; *c; c++) car |= 1u << (*c - 'A');
     const int32_t mAB = -(int32_t)(src[0] >> 1 & 1), mAC = -(int32_t)(src[0] >> 2 & 1), mAD = -(int32_t)(src[0] >> 3 & 1);
     const int32_t mBC = -(int32_t)(src[1] >> 2 & 1), mBD = -(int32_t)(src[1] >> 3 & 1), mCD = -(int32_t)(src[2] >> 3 & 1);
     const int32_t cA = -(int32_t)(car & 1), cB = -(int32_t)(car >> 1 & 1), cC = -(int32_t)(car >> 2 & 1), cD = -(int32_t)(car >> 3 & 1);

@@ -33,6 +33,7 @@ and screenshots of the new screens (`make shots`).
 ## Done
 
 - 0.3.1: CHOP SPLIT: TRANS (the transients, SENS) or EVEN (SLICES equal parts, 2..64); the screen marks the cuts
+- 0.3.2: the screen as the mockup draws it: OP4's algorithm drawn with the operator's envelope, the LFO's cycle with its moving position, the ENV's ADSR, rounded chips, boxes and pills
   (from the analysis the audio thread already made: the UI never analyses). Flash format 4 (8 spare bytes in the
   recipe for later parameters); formats 1-3 convert, tested on the FM-1 from format 3.
 
