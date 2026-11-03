@@ -222,6 +222,8 @@ const PAGE_INFO={
 const SEL_LBL={SRC:()=>'ENGINE',PLAY:()=>'STEP',MOD:()=>'SRC',FX:()=>'SLOT',RESAMPLE:()=>'—',BANK:()=>'GEN',GLO:()=>'—'};
 /* "why" hints for parameters */
 const WHY={
+ SPLIT:'how CHOP cuts the resample: TRANS at its transients (SENS), EVEN into SLICES equal parts',
+ SLICES:'the number of equal parts under SPLIT EVEN: 2 to 64',
  VOICING:'rewrites the step\'s notes from its pitch classes: CLOSE, OPEN, DROP2, SPREAD, or VEFF (root and fifth low, 9ths and 11ths packed high); edit any note after',
  BASS:'a separate low note under the chord, played first by every strum; — = none',
  ALG:'the algorithm decides which operators modulate others and which ones you hear (carriers)',
@@ -309,7 +311,7 @@ function mkSound(name,seed){
   anlg:{o1:0,o2:1,det:14,mix:64,sub:40,nois:0,sync:0,pw:64,cut:70,res:40,env:84,drv:20,atk:2,dec:50,sus:90,rel:40},
   samp:{start:0,len:127,loop:0,rev:0,pitch:24,fine:50,fade:6,gain:100},
   gran:{pos:40,size:30,dens:64,spray:20,pitch:24,prnd:6,rev:12,win:0,frz:0,width:80,seed:17},
-  chop:{sens:64,slice:0,pitch:24,rev:0,order:0,len:127,atk:0,dec:100,map:0},
+  chop:{split:0,count:16,sens:64,slice:0,pitch:24,rev:0,order:0,len:127,atk:0,dec:100,map:0},
   play:{mode:2,strum:0,time:30,hum:10,vel:96,len:8,sprd:20,rate:1,sel:0,
    steps:[chord(0,4,7),chord(5,3,5),chord(9,4,5),chord(7,0,7),chord(0,4,7),chord(8,3,3),chord(5,7,5),chord(7,5,9)],
    seq:Array.from({length:16},(_,i)=>({on:[0,3,6,8,11,14].includes(i)?1:0,note:48+[0,0,3,0,0,7,0,0,5,0,0,3,0,0,10,0][i],slide:0,prob:100}))},
@@ -364,6 +366,7 @@ function wpath(a,W,H,cut){
 }
 function slices(s){
  if(s.input==null)return[];
+ if(s.chop.split){const k=s.chop.count||16;return Array.from({length:k},(_,i)=>i/k*220)}   /* EVEN: equal parts */
  const w=wave(gById(s,s.input).seed),thr=1-s.chop.sens/127;
  return w.on.filter((o,i)=>i===0||o.amp>=thr).map(o=>o.pos/(w.n-1)*220).filter((x,i,a)=>i===0||x-a[i-1]>2);
 }
@@ -421,9 +424,9 @@ function rows(s){
    [P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),P('PRND',o,'prnd',0,127),P('REV',o,'rev',0,127,v=>Math.round(v/127*100)+'%'),Ls('WIN',o,'win',['HANN','TRI','RECT','EXP'])],
    [Ls('FRZ',o,'frz',ONOFF),P('WIDTH',o,'width',0,127),P('SEED',o,'seed',0,999),null]]}
   const o=s.chop,n=slices(s).length;return[
-   [P('SENS',o,'sens',0,127),P('SLICE',o,'slice',0,Math.max(0,n-1),v=>v+1),P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),Ls('REV',o,'rev',ONOFF)],
-   [Ls('ORDER',o,'order',['SEQ','SHUF','STUT','REV']),P('LEN',o,'len',1,127),P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127)],
-   [Ls('MAP',o,'map',['KEYS','STEPS']),null,null,null]]}
+   [Ls('SPLIT',o,'split',['TRANS','EVEN']),o.split?P('SLICES',o,'count',2,64):P('SENS',o,'sens',0,127),P('SLICE',o,'slice',0,Math.max(0,n-1),v=>v+1),P('PITCH',o,'pitch',0,48,v=>sgn(v-24))],
+   [Ls('REV',o,'rev',ONOFF),Ls('ORDER',o,'order',['SEQ','SHUF','STUT','REV']),P('LEN',o,'len',1,127),P('ATK',o,'atk',0,127)],
+   [P('DEC',o,'dec',0,127),Ls('MAP',o,'map',['KEYS','STEPS']),null,null]]}
  case 'PLAY':{
   const r0=[Ls('MODE',p,'mode',PMODES),Ls('STRUM',p,'strum',STRUMS),P('TIME',p,'time',0,127,v=>Math.round(v/127*250)+'ms'),P('HUMAN',p,'hum',0,127)];
   const steps=P('STEPS',p,'len',1,16);
@@ -469,7 +472,7 @@ function rows(s){
  return[[null,null,null,null]];
 }
 /* modulation destination name for a parameter in the current context (page + selected operator/slot/source) */
-const NOMOD=new Set(['VOICE','SRC','KEY','BANDS','T1','T2','T3','T4','VOICING','BASS','N5','N6','N7','N8','MODE','TYPE','MOVE','ON','STEPS','SEED','MAP','ORDER','FIX','SYNC','TRIG','LOOP','ROOT','LEN','GATE','NOTE','SLIDE','PROB','ALG','WIN','FRZ','REV','STRUM','OSC1','OSC2','WAVE',
+const NOMOD=new Set(['SPLIT','SLICES','VOICE','SRC','KEY','BANDS','T1','T2','T3','T4','VOICING','BASS','N5','N6','N7','N8','MODE','TYPE','MOVE','ON','STEPS','SEED','MAP','ORDER','FIX','SYNC','TRIG','LOOP','ROOT','LEN','GATE','NOTE','SLIDE','PROB','ALG','WIN','FRZ','REV','STRUM','OSC1','OSC2','WAVE',
  'D1','D2','D3','D4','A1','A2','A3','A4','N1','N2','N3','N4']);
 const modShort=i=>i<6?'L'+(i+1):i<9?'E'+(i-5):'SC';
 function destName(s,p){

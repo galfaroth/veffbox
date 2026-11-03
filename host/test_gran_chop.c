@@ -168,11 +168,11 @@ static void chop_phrase(const uint8_t *p, int32_t *a, int n, const char *path)
 static void chop_tests(int32_t *a, int32_t *b)
 {
     const vb_engine_t *e = &vb_chop;
-    static const char *const L[9] = { "SENS", "SLICE", "PITCH", "REV", "ORDER", "LEN", "ATK", "DEC", "MAP" };
+    static const char *const L[11] = { "SENS", "SLICE", "PITCH", "REV", "ORDER", "LEN", "ATK", "DEC", "MAP", "SPLIT", "SLICES" };
     uint8_t p[VB_CH_NPARAMS];
     uint16_t st[VB_CH_MAXSLICES];
     _Alignas(8) uint8_t v[VB_VOICE_BYTES];
-    desc_checks(e, 9, L);
+    desc_checks(e, 11, L);
 
     /* detection at a middle SENS (set through a voice's note_on: vb_chop_slices uses the last SENS seen) */
     defaults(e, p);
@@ -216,7 +216,21 @@ static void chop_tests(int32_t *a, int32_t *b)
         m = vb_chop_slices(st, VB_CH_MAXSLICES);
         CHECK(m == 8, "CHOP: restored contents: %d slices", m);
     }
+    /* SPLIT EVEN: SLICES equal parts, whatever the transients */
+    p[VB_CH_SPLIT] = VB_CH_EVEN;
+    for (int k = 2; k <= VB_CH_MAXSLICES; k *= 2) {
+        p[VB_CH_SLICES] = (uint8_t)k;
+        e->note_on(v, p, 60, 100);
+        int m = vb_chop_slices(st, VB_CH_MAXSLICES);
+        CHECK(m == k, "CHOP EVEN %d: %d slices", k, m);
+        for (int i = 0; i < m; i++)
+            CHECK(abs((int)st[i] - (int)((uint32_t)PLEN * (uint32_t)i / (uint32_t)k)) <= 1, "CHOP EVEN %d: slice %d at %d", k, i, st[i]);
+    }
+    printf("CHOP EVEN: 2 .. 64 equal slices\n");
+    p[VB_CH_SPLIT] = VB_CH_TRANS;
+    e->note_on(v, p, 60, 100);
     n = vb_chop_slices(st, VB_CH_MAXSLICES);
+    CHECK(n == 8, "CHOP: back to TRANS: %d slices", n);
 
     /* each key plays its slice: SEQ, REV, SHUF, and keys wrap */
     defaults(e, p); p[VB_CH_DEC] = 127;

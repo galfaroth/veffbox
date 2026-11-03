@@ -603,7 +603,16 @@ static void build_rows(void)
             cl(2, 0, "LEVEL", K_U8, F_NUM, &RC->drum.lvl[v], 0, 127, 0, VB_ADDR(VB_D_DRUM, v * 9 + 8), 0);
             cl(2, 1, "VOICE", K_U8, F_LIST, &ui.dvoice, 0, 7, VN, VB_ADDR_NONE, 0);
             NR = 3;
-        } else if (RC->src == VB_SRC_GRAN || RC->src == VB_SRC_CHOP) {
+        } else if (RC->src == VB_SRC_CHOP) {                 /* SPLIT first; SENS (TRANS) or SLICES (EVEN) next to it */
+            static const uint8_t K[11] = {VB_CH_SPLIT, VB_CH_SENS, VB_CH_SLICE, VB_CH_PITCH, VB_CH_REV, VB_CH_ORDER,
+                                          VB_CH_LEN, VB_CH_ATK, VB_CH_DEC, VB_CH_MAP, 255};
+            uint32_t i;
+            for (i = 0; i < 10u; i++) {
+                uint32_t k = K[i] == VB_CH_SENS && RC->chop[VB_CH_SPLIT] == VB_CH_EVEN ? VB_CH_SLICES : K[i];
+                cd(i / 4u, i % 4u, &vb_chop.desc.params[k], &RC->chop[k], VB_ADDR(VB_D_CHOP, k));
+            }
+            NR = 3;
+        } else if (RC->src == VB_SRC_GRAN) {
             const vb_engine_t *e = RC->src == VB_SRC_GRAN ? &vb_gran : &vb_chop;
             uint8_t *base = RC->src == VB_SRC_GRAN ? RC->gran : RC->chop;
             uint32_t i, dom = RC->src == VB_SRC_GRAN ? VB_D_GRAN : VB_D_CHOP;
@@ -1416,6 +1425,10 @@ static void key(uint32_t n, int down)
         pl->sel = (uint8_t)((pl->sel + 1u) % (pl->len ? pl->len : 1u));
         ui.d_vis = ui.d_prm = 1;
     }
+    if (RC->src == VB_SRC_CHOP && ui.page == PG_SRC) {     /* the slices are known once the note has played */
+        ui.d_vis = 1;
+        ui.vis_due = fm1_ms + 80u;
+    }
     if (RC->src == VB_SRC_DRUM && ui.dvoice != (uint8_t)(note % 8)) {
         ui.dvoice = (uint8_t)(note % 8);
         if (ui.page == PG_SRC)
@@ -1740,9 +1753,18 @@ static void vis_print(void)
         int32_t s = (int32_t)(RC->gran[0] * 220u / 127u), w = (int32_t)(RC->gran[3] * 110u / 127u);
         cv_rect(10 + s, 4, 3, 104, C_INK);
         cv_hdot(10 + (s - w < 0 ? 0 : s - w), 10 + (s + w > 219 ? 219 : s + w), 6, C_INK);
-    } else if (RC->src == VB_SRC_CHOP) {
-        char m[16] = "SLICE ";
-        utoa10(m + 6, RC->chop[1] + 1u);
+    } else if (RC->src == VB_SRC_CHOP) {                   /* where it cuts, and how many */
+        static uint16_t st[VB_CH_MAXSLICES];
+        char m[24] = "";
+        int n = vb_chop_cached(RC->chop, st, VB_CH_MAXSLICES), k;
+        for (k = 1; k < n; k++)
+            cv_vdot(10 + (int32_t)(st[k] * 220u / len), 4, 104, C_INK);
+        if (n < 0) {
+            str_cpy(m, "PLAY A KEY", sizeof m);
+        } else {
+            utoa10(m, (uint32_t)n);
+            cat(m, RC->chop[VB_CH_SPLIT] == VB_CH_EVEN ? " EVEN SLICES" : " SLICES", sizeof m);
+        }
         md_text(10, 4, &MD_F3, 2, m, C_INK);
     }
     {

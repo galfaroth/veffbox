@@ -17,7 +17,7 @@ extern const char *const vb_src_name[VB_SRCS];
 #define VB_OP4_NP 38
 #define VB_ANLG_NP 16
 #define VB_GRAN_NP 11                     /* POS SIZE DENS SPRAY PITCH PRND REV WIN FRZ WIDTH SEED */
-#define VB_CHOP_NP 9                      /* SENS SLICE PITCH REV ORDER LEN ATK DEC MAP */
+#define VB_CHOP_NP 11                     /* SENS SLICE PITCH REV ORDER LEN ATK DEC MAP SPLIT SLICES */
 #define VB_SAMP_NP 8                      /* START LEN LOOP REV PITCH FINE FADE GAIN */
 #define VB_CHORD_STEPS 16
 #define VB_CHORD_TYPES 22
@@ -67,6 +67,7 @@ typedef struct {
     uint8_t pnote;                        /* the note a NOTE print plays (the last key) */
     uint16_t bpm10;                       /* the tempo at the print: a REBUILD renders at it */
     uint32_t seed;
+    uint8_t spare[8];                     /* zero; room for new parameters whose 0 keeps the old sound */
 } vb_recipe_t;
 
 /* parameter addresses: domain << 8 | index */

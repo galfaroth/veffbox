@@ -32,6 +32,10 @@ and screenshots of the new screens (`make shots`).
 
 ## Done
 
+- 0.3.1: CHOP SPLIT: TRANS (the transients, SENS) or EVEN (SLICES equal parts, 2..64); the screen marks the cuts
+  (from the analysis the audio thread already made: the UI never analyses). Flash format 4 (8 spare bytes in the
+  recipe for later parameters); formats 1-3 convert, tested on the FM-1 from format 3.
+
 - 0.3.0: chords: 16 steps of up to 8 notes, 22 types (6, m6, 6/9, maj9, 9, m11, 7sus4, maj7#11, m7b5, aug, madd9
   added), the BASS as a chord tone (1 root, 2 third, 3 fifth ...) in octave 2, VOICING (CLOSE OPEN DROP2 SPREAD VEFF),
   extended names. EDIT on PLAY (SEL runs it): INS, DUP, DEL, ON/OFF in SEQ. OCT on PLAY moves the selected chord or

@@ -6,12 +6,14 @@
 static const char *const ONOFF[2] = {"OFF", "ON"};
 static const char *const ORDERN[4] = {"SEQ", "SHUF", "STUT", "REV"};
 static const char *const MAPN[2] = {"KEYS", "STEPS"};
+static const char *const SPLITN[2] = {"TRANS", "EVEN"};
 static const vb_param_t PARAMS[VB_CH_NPARAMS] = {
     {"SENS", 0, 127, 64, 0, 0},           {"SLICE", 0, VB_CH_MAXSLICES - 1, 0, 0, 0},
     {"PITCH", 0, 48, 24, VB_P_MOD | VB_P_BIPOLAR, 0}, {"REV", 0, 1, 0, VB_P_LIST, ONOFF},
     {"ORDER", 0, 3, 0, VB_P_LIST, ORDERN}, {"LEN", 1, 127, 127, VB_P_MOD, 0},
     {"ATK", 0, 127, 0, VB_P_MOD, 0},      {"DEC", 0, 127, 100, VB_P_MOD, 0},
-    {"MAP", 0, 1, 0, VB_P_LIST, MAPN},
+    {"MAP", 0, 1, 0, VB_P_LIST, MAPN},    {"SPLIT", 0, 1, 0, VB_P_LIST, SPLITN},
+    {"SLICES", 2, VB_CH_MAXSLICES, 16, 0, 0},
 };
 
 /* 2^(k/12), Q16 */
@@ -34,7 +36,13 @@ static struct {
     uint16_t start[VB_CH_MAXSLICES];
     uint8_t perm[VB_CH_MAXSLICES];
 } C;
-static int last_sens = 64;
+static int last_sens = 64;      /* the slicing key: SENS, or 1000 + SLICES under SPLIT EVEN */
+static int key_of(const uint8_t *p)
+{
+    if (p[VB_CH_SPLIT] == VB_CH_EVEN)
+        return 1000 + vb_clamp(p[VB_CH_SLICES], 2, VB_CH_MAXSLICES);
+    return p[VB_CH_SENS];
+}
 static uint32_t step;          /* MAP STEPS: shared by all CHOP voices, reset by voice_init */
 
 static uint32_t fingerprint(const int16_t *b, uint32_t len)
@@ -55,6 +63,31 @@ static int32_t flux(const uint16_t *lvl, uint32_t b)
     return (int32_t)lvl[b] - ref;
 }
 
+static void shuffle(int n)
+{
+    uint32_t r = 0x5EED1234u ^ (uint32_t)n * 0x9E3779B9u;   /* SHUF: a fixed permutation for each slice count */
+    int c;
+    for (c = 0; c < n; c++)
+        C.perm[c] = (uint8_t)c;
+    for (c = n - 1; c > 0; c--) {
+        uint32_t j = vb_rng(&r) % (uint32_t)(c + 1);
+        uint8_t t = C.perm[c];
+        C.perm[c] = C.perm[j];
+        C.perm[j] = t;
+    }
+}
+
+static void split_even(uint32_t len, int n)               /* SPLIT EVEN: n equal parts */
+{
+    int i;
+    if ((uint32_t)n > len / 64u)
+        n = (int)(len / 64u) < 1 ? 1 : (int)(len / 64u);
+    for (i = 0; i < n; i++)
+        C.start[i] = (uint16_t)(len * (uint32_t)i / (uint32_t)n);
+    C.n = n;
+    shuffle(n);
+}
+
 static void detect(const int16_t *buf, uint32_t len, int sens)
 {
     static uint16_t lvl[MAXBLK];
@@ -62,7 +95,6 @@ static void detect(const int16_t *buf, uint32_t len, int sens)
     static int32_t cf[MAXBLK / 2 + 1];
     uint32_t nb = len / BLK, b, i, nc = 0;
     int32_t maxf = 0, thr;
-    uint32_t r;
     int n = 1, c;
     if (nb > MAXBLK)
         nb = MAXBLK;
@@ -123,15 +155,7 @@ static void detect(const int16_t *buf, uint32_t len, int sens)
         }
     }
     C.n = n;
-    r = 0x5EED1234u ^ (uint32_t)n * 0x9E3779B9u;   /* SHUF: a fixed permutation for each slice count */
-    for (c = 0; c < n; c++)
-        C.perm[c] = (uint8_t)c;
-    for (c = n - 1; c > 0; c--) {
-        uint32_t j = vb_rng(&r) % (uint32_t)(c + 1);
-        uint8_t t = C.perm[c];
-        C.perm[c] = C.perm[j];
-        C.perm[j] = t;
-    }
+    shuffle(n);
 }
 
 /* the slices of the current print at `sens`; returns the count (0: no usable print) */
@@ -145,7 +169,10 @@ static int ensure(int sens, const int16_t **pbuf, uint32_t *plen)
         return 0;
     fp = fingerprint(buf, len);
     if (!C.valid || C.buf != buf || C.len != len || C.fp != fp || C.sens != sens) {
-        detect(buf, len, sens);
+        if (sens >= 1000)
+            split_even(len, sens - 1000);
+        else
+            detect(buf, len, sens);
         C.buf = buf;
         C.len = len;
         C.fp = fp;
@@ -153,6 +180,19 @@ static int ensure(int sens, const int16_t **pbuf, uint32_t *plen)
         C.valid = 1;
     }
     return C.n;
+}
+
+int vb_chop_cached(const uint8_t *p, uint16_t *starts, int max)
+{
+    uint32_t len;
+    const int16_t *buf = vb_samp_buffer(&len);
+    int i, n;
+    if (!C.valid || C.buf != buf || C.len != len || C.sens != key_of(p))
+        return -1;
+    n = C.n;
+    for (i = 0; i < n && i < max; i++)
+        starts[i] = C.start[i];
+    return n;
 }
 
 int vb_chop_slices(uint16_t *starts, int max)
@@ -235,7 +275,7 @@ static void note_on(void *v, const uint8_t *p, int note, int vel)
     const int16_t *buf;
     uint32_t blen, a, e, L;
     int n, k, i, order = p[VB_CH_ORDER] & 3;
-    last_sens = p[VB_CH_SENS];
+    last_sens = key_of(p);
     n = ensure(last_sens, &buf, &blen);
     if (!n) {
         s->on = s->pend = 0;
@@ -286,7 +326,7 @@ static int render(void *v, const uint8_t *p, int32_t *out, int n)
     const int16_t *buf = vb_samp_buffer(&blen);
     int32_t att, dec;
     int i;
-    last_sens = p[VB_CH_SENS];                /* only remembered, for vb_chop_slices */
+    last_sens = key_of(p);                    /* only remembered, for vb_chop_slices */
     if (!s->on)
         return 0;
     if (!buf || blen < s->a + s->len) {       /* the print changed under the voice */
