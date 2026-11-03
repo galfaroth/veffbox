@@ -1,3 +1,5 @@
 host/test_core
 host/out/
 .DS_Store
+build-fm1/
+dist/

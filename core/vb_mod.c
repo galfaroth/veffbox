@@ -27,7 +27,7 @@ static int32_t wave(vb_lfo_t *l, uint32_t ph)
     case VB_LFO_SH: return l->sh;
     default: {   /* EXP: a cubic fall over the cycle */
         int32_t e = 32767 - (int32_t)(ph >> 17);
-        int32_t cube = (int32_t)(((int64_t)e * e >> 15) * e >> 15);
+        int32_t cube = ((e * e) >> 15) * e >> 15;   /* e < 2^15: fits */
         return cube * 2 - 32767;
     }
     }
