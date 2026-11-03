@@ -9,68 +9,89 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#fcf2f8;--surface:#f4d9ea;--tray:#ecc6de;--accent:#e07fb5;--accent-ink:#9c2f69;--ink:#1d0819;--ink-2:#4a2a40;
-  --key:#fffafd;--key-b:#e5b9d4;--mono:'Space Mono',ui-monospace,Menlo,monospace;
+  --bg:#fcf2f8;--body:#f4d9ea;--tray:#ecc6de;--btn:#fbeaf4;--raised:#d9a3c4;--ink:#1d0819;--ink-2:#4a2a40;--scr:#eaa7cc;
+  --accent:#e07fb5;--accent-ink:#9c2f69;--soft:#fcf2f8;--mono:'Space Mono',ui-monospace,Menlo,monospace;
 }
-*{box-sizing:border-box;margin:0}
-html,body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',system-ui,sans-serif;-webkit-text-size-adjust:100%}
-body{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px}
-.dev{width:100%;max-width:980px;background:var(--surface);border-radius:32px;padding:20px;box-shadow:0 2px 0 var(--tray),0 24px 60px #9c2f6922;user-select:none;-webkit-user-select:none;touch-action:manipulation}
-.top{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
-@media (min-width:760px){.top{grid-template-columns:auto minmax(0,1fr);align-items:start}}
-.screen{position:relative;background:var(--ink);border-radius:22px;padding:12px;width:min(100%,384px);margin:0 auto}
-canvas{display:block;width:100%;aspect-ratio:1;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:8px;background:#e07fb5}
-.start{position:absolute;inset:12px;border:0;border-radius:8px;background:#e07fb5;color:var(--ink);font:700 22px/1.2 'Space Grotesk',sans-serif;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer}
-.start small{font:400 13px/1.3 var(--mono);max-width:24ch;text-align:center}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',system-ui,sans-serif;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+body{padding:16px;display:flex;flex-direction:column;align-items:center;gap:14px}
+
+/* the step-by-step card */
+#tour{width:100%;max-width:1000px;background:var(--ink);color:var(--soft);border-radius:22px;padding:14px 18px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 16px;align-items:center}
+#tour[hidden]{display:none}
+#tour .n{font:700 13px/1 var(--mono);color:var(--accent);white-space:nowrap}
+#tour h2{font-size:21px;line-height:1.15;letter-spacing:-.01em}
+#tour h2 kbd{font:700 15px/1 var(--mono);background:var(--accent);color:var(--ink);border-radius:6px;padding:2px 7px;vertical-align:2px}
+#tour p{grid-column:2;font-size:16px;line-height:1.4;color:#f3cfe3}
+#tour .nav{display:flex;gap:6px;grid-row:1 / span 2;grid-column:3}
+#tour button{border:0;border-radius:999px;padding:8px 13px;font:700 13px/1 inherit;font-family:inherit;cursor:pointer;background:#ffffff1a;color:var(--soft)}
+#tour button[hidden]{display:none}
+#tour button.go{background:var(--accent);color:var(--ink)}
+#tour .bar{grid-column:1 / -1;height:4px;border-radius:2px;background:#ffffff1a;overflow:hidden}
+#tour .bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
+@media (max-width:640px){#tour{grid-template-columns:minmax(0,1fr)}#tour p,#tour .nav{grid-column:1;grid-row:auto}#tour h2{font-size:18px}#tour p{font-size:15px}}
+
+/* the FM-1 panel, scaled to the width */
+#devWrap{position:relative;flex:none}
+#dev{position:absolute;left:0;top:0;transform-origin:0 0;background:var(--body);border-radius:44px;user-select:none;-webkit-user-select:none;touch-action:manipulation;box-shadow:0 3px 0 #e8bcd6,0 30px 70px #c0679a30}
+#dev>*{position:absolute}
+.tray{background:var(--tray);border-radius:22px;box-shadow:inset 0 3px 8px #a0507f22}
+.bezel{background:var(--ink);border-radius:26px}
+.brand{font-size:22px;font-weight:700;letter-spacing:-.03em}
+#lcd{display:block;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:4px;background:var(--scr)}
+.start{border:0;border-radius:4px;background:var(--scr);color:var(--ink);font:700 22px/1.2 'Space Grotesk',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;z-index:3}
+.start small{font:400 12px/1.35 var(--mono);max-width:22ch;text-align:center}
 .start[hidden]{display:none}
-.controls{display:flex;flex-direction:column;gap:16px}
-.encs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 6px}
-.enc{display:flex;flex-direction:column;align-items:center;gap:4px;font:700 11px/1 var(--mono);letter-spacing:.04em;color:var(--ink-2);touch-action:none;cursor:ns-resize}
-.enc i{width:52px;height:52px;border-radius:50%;background:var(--ink);position:relative;box-shadow:0 3px 0 #00000033}
-.enc.k i{background:var(--accent)}
-.enc i::after{content:"";position:absolute;left:50%;top:6px;width:4px;height:14px;margin-left:-2px;border-radius:2px;background:var(--bg);transform-origin:2px 20px;transform:rotate(var(--r,0deg))}
-.enc.k i::after{background:var(--ink)}
-.btns{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
-.b{border:0;border-radius:12px;background:var(--key);color:var(--ink);font:700 12px/1.1 'Space Grotesk',sans-serif;padding:9px 2px 7px;box-shadow:0 3px 0 var(--key-b);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
-.b small{font:400 9.5px/1 var(--mono);color:var(--accent-ink);letter-spacing:.02em}
-.b.on{background:var(--ink);color:var(--bg)}
-.b.on small{color:var(--accent)}
-.b:active,.b.down{transform:translateY(2px);box-shadow:0 1px 0 var(--key-b)}
-.b.rec small{color:#c0186e}
-.row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.vol{display:flex;align-items:center;gap:8px;font:700 11px var(--mono);color:var(--ink-2)}
-.vol input{accent-color:var(--ink);width:120px}
-.keys{position:relative;margin-top:18px;height:150px;background:var(--tray);border-radius:20px;padding:10px;touch-action:none}
-.keys .w,.keys .k2{position:absolute;border-radius:0 0 10px 10px;cursor:pointer}
-.keys .w{background:var(--key);box-shadow:inset 0 -4px 0 var(--key-b);top:10px;bottom:10px}
-.keys .k2{background:#d993bd;top:10px;height:58%;z-index:1;box-shadow:inset 0 -4px 0 #b9709d}
-.keys .down{filter:brightness(.82)}
-.help{max-width:980px;width:100%;margin-top:14px;font-size:14px;line-height:1.5;color:var(--ink-2)}
-.help kbd{font:12px var(--mono);background:var(--surface);border-radius:6px;padding:1px 6px;box-shadow:0 2px 0 var(--tray)}
-.help a{color:var(--accent-ink)}
+.knob{touch-action:none;cursor:ns-resize}
+.kb{position:absolute;inset:0;border-radius:50%;background:var(--ink);box-shadow:0 4px 0 #0005}
+.kb i{position:absolute;left:50%;top:5px;width:5px;height:15px;margin-left:-2.5px;border-radius:3px;background:var(--scr);transform-origin:50% 18px;transform:rotate(var(--r,0deg))}
+.knob.k .kb{background:var(--scr);box-shadow:inset 0 0 0 4px var(--ink),0 4px 0 #0005}
+.knob.k .kb i{background:var(--ink)}
+.kl{position:absolute;left:50%;transform:translateX(-50%);text-align:center;white-space:nowrap;line-height:1.05;pointer-events:none}
+.kl small{display:block;font-size:10px;font-weight:500;letter-spacing:.06em;opacity:.7}
+.kl b{font-size:15px}
+.b{background:var(--btn);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;cursor:pointer;box-shadow:0 3px 0 #d7a8c6;text-align:center}
+.b b{font-size:12px;letter-spacing:.04em}
+.b small{font-size:10px;font-weight:700;color:#a84a83;margin-top:3px;white-space:nowrap}
+.b.on{background:var(--ink);color:var(--scr);box-shadow:0 3px 0 #000}
+.b.on small{color:var(--soft)}
+.b.rec{background:var(--scr)}
+.b.rec small{color:var(--ink)}
+.b.down,.key.down{transform:translateY(2px);box-shadow:0 1px 0 #d7a8c6}
+.key{border-radius:999px;cursor:pointer;box-shadow:0 4px 0 #c995b6;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:10px;font-size:11px;font-weight:700}
+.key.w{background:var(--btn)}
+.key.k2{background:var(--raised);color:var(--soft);box-shadow:0 4px 0 #a9708f}
+.key.down{background:var(--scr)!important;color:var(--ink)}
+.key::before{content:'';width:5px;height:22px;border-radius:3px;background:currentColor;opacity:.35;margin-bottom:auto;margin-top:14px}
+.key .kn{opacity:.7}
+
+/* what to press next */
+.hl{z-index:4;animation:hl 1.1s ease-in-out infinite}
+.hl.b,.tray.hl{outline:4px solid var(--ink);outline-offset:4px}
+.hl.knob .kb{outline:4px solid var(--ink);outline-offset:5px;animation:hl 1.1s ease-in-out infinite}
+.hl.start{outline:4px solid var(--ink);outline-offset:-4px}
+@keyframes hl{50%{outline-color:transparent}}
+.tag{position:absolute;z-index:5;background:var(--ink);color:var(--soft);font:700 14px/1 'Space Grotesk',sans-serif;padding:7px 11px;border-radius:999px;white-space:nowrap;pointer-events:none;transform:translateX(-50%)}
+.tag[hidden]{display:none}
+
+.help{max-width:1000px;width:100%;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.help kbd{font:12px var(--mono);background:var(--body);border-radius:6px;padding:1px 6px;box-shadow:0 2px 0 var(--tray)}
 .err{color:#b00045;font-weight:700}
+@media (prefers-reduced-motion:reduce){.hl,.hl.knob .kb{animation:none}}
 </style>
 </head>
 <body>
-<div class="dev" id="dev">
-  <div class="top">
-    <div class="screen">
-      <canvas id="lcd" width="240" height="240" aria-label="The FM-1 screen"></canvas>
-      <button class="start" id="start" type="button">▶ Start the emulator<small>the Veffbox firmware, in your browser, with sound</small></button>
-    </div>
-    <div class="controls">
-      <div class="encs" id="encs"></div>
-      <div class="btns" id="btns"></div>
-      <div class="row2"><label class="vol">MASTER <input id="vol" type="range" min="0" max="4095" value="2600"></label></div>
-    </div>
-  </div>
-  <div class="keys" id="keys" aria-label="27 keys"></div>
-</div>
-<p class="help" id="help">Knobs: drag up or down, or scroll. Computer keys: <kbd>Z</kbd><kbd>S</kbd><kbd>X</kbd><kbd>D</kbd><kbd>C</kbd>… and
+<section id="tour" hidden aria-live="polite">
+  <span class="n" id="tn"></span>
+  <h2 id="tt"></h2>
+  <div class="nav"><button type="button" id="tback">Back</button><button type="button" id="tskip">Skip</button></div>
+  <p id="tw"></p>
+  <div class="bar"><i id="tbar"></i></div>
+</section>
+<div id="devWrap"><div id="dev"></div></div>
+<p class="help">Knobs: drag up or down, or scroll. Computer keys: <kbd>Z</kbd><kbd>S</kbd><kbd>X</kbd><kbd>D</kbd><kbd>C</kbd>… and
   <kbd>Q</kbd><kbd>2</kbd><kbd>W</kbd><kbd>3</kbd>… play the keys chromatically from F, <kbd>Space</kbd> PLAY, <kbd>Enter</kbd> REC,
-  <kbd>\</kbd> SEL (hold to undo), <kbd>[</kbd> <kbd>]</kbd> SELECT, <kbd>←</kbd> <kbd>→</kbd> OCT. Your bank is kept in this browser.
-  New here? <a href="../#guide" target="_top">Make your first sound</a>.</p>
+  <kbd>\</kbd> SEL (hold to undo), <kbd>[</kbd> <kbd>]</kbd> SELECT, <kbd>←</kbd> <kbd>→</kbd> OCT. Your bank is kept in this browser.</p>
 <script src="veffbox.js"></script>
 <script>
 (() => {
@@ -78,80 +99,213 @@ canvas{display:block;width:100%;aspect-ratio:1;image-rendering:pixelated;image-r
 /* Veffbox's order (fw/vb_app.c B_* and EN_*) */
 const BTN = ['FX','SEL','ENV','LFO','EDIT','GLO','HOME','SAVE','ARP','SEQ','PLAY','REC','OCT-','OCT+'];
 const SUB = {FX:'FX',SEL:'ACT',ENV:'ENV',LFO:'LFO',EDIT:'SRC',GLO:'GLO',HOME:'RESAMPLE',SAVE:'BANK',ARP:'MODE',SEQ:'STEP',PLAY:'▶ ■',REC:'● RESAMPLE','OCT-':'','OCT+':''};
-const LAYOUT = ['FX','SEL','ENV','LFO','EDIT','GLO','HOME','SAVE','ARP','SEQ','PLAY','REC','OCT-','OCT+'];
-const ENC = [['SELECT',0],['ALGORITHM',1],['PRESETS',2],['',-1],['KNOB 1',3],['KNOB 2',4],['KNOB 3',5],['KNOB 4',6]];
-const KEYMAP = 'zsxdcfvbhnjm,l.;/q2w3e4rt6y'; /* 27 keys, chromatic from key 0 */
+const ENC_ID = {SELECT:0, ALGORITHM:1, PRESETS:2, K1:3, K2:4, K3:5, K4:6};      /* MASTER: this page's volume */
+const ENC_NAME = {MASTER:'VOL', SELECT:'SELECT', ALGORITHM:'TRACK', PRESETS:'SOUND', K1:'KNOB 1', K2:'KNOB 2', K3:'KNOB 3', K4:'KNOB 4'};
+const ENC_SMALL = {MASTER:'MASTER', SELECT:'SELECT', ALGORITHM:'ALGORITHM', PRESETS:'PRESETS', K1:'KNOB1', K2:'KNOB2', K3:'KNOB3', K4:'KNOB4'};
+const KEYMAP = 'zsxdcfvbhnjm,l.;/q2w3e4rt6y'; /* 27 keys, chromatic from key 0 (F) */
 const STORE = 'veffbox-flash-v1';
-let M = null, ctx = null, img = null, flashSeen = 0, lastSave = 0, raf = 0;
+let M = null, ctx = null, img = null, flashSeen = 0, lastSave = 0, LAY = null, vol = 2600;
 const $ = id => document.getElementById(id);
-const lcd = $('lcd'), g = lcd.getContext('2d');
 
-/* ---- the panel */
-const encs = $('encs');
-ENC.forEach(([name, id]) => {
-  const el = document.createElement('div');
-  if (id < 0) { encs.appendChild(el); return; }
-  el.className = 'enc' + (id >= 3 ? ' k' : '');
-  el.innerHTML = `<i></i><span>${name}</span>`;
-  let rot = 0, y0 = null, acc = 0;
-  const turn = d => { if (!M || !d) return; M._emu_encoder(id, d); rot += d * 15; el.style.setProperty('--r', rot + 'deg'); };
-  el.addEventListener('pointerdown', e => { y0 = e.clientY; acc = 0; el.setPointerCapture(e.pointerId); });
-  el.addEventListener('pointermove', e => { if (y0 === null) return; acc += y0 - e.clientY; y0 = e.clientY;
-    const d = Math.trunc(acc / 10); if (d) { acc -= d * 10; turn(d); } });
-  el.addEventListener('pointerup', () => { y0 = null; });
-  el.addEventListener('wheel', e => { e.preventDefault(); turn(e.deltaY < 0 ? 1 : -1); }, {passive: false});
-  encs.appendChild(el);
-});
-const btnEl = {};
-LAYOUT.forEach(name => {
-  const b = document.createElement('button');
-  b.type = 'button'; b.className = 'b' + (name === 'REC' ? ' rec' : '');
-  b.innerHTML = `${name}<small>${SUB[name] || '&nbsp;'}</small>`;
-  const i = BTN.indexOf(name);
-  const down = e => { e.preventDefault(); if (M) { M._emu_button(i, 1); b.classList.add('down'); } };
-  const up = () => { if (M && b.classList.contains('down')) { M._emu_button(i, 0); b.classList.remove('down'); } };
-  b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up);
-  btnEl[i] = b; $('btns').appendChild(b);
-});
-/* 27 keys from F: white and black like a keyboard */
-const keys = $('keys'), keyEl = [];
-(() => {
-  const black = n => [1, 3, 6, 8, 10].includes((n + 5) % 12);         /* key 0 = F */
-  const whites = [...Array(27).keys()].filter(n => !black(n)).length;
-  let w = 0;
-  for (let n = 0; n < 27; n++) {
-    const el = document.createElement('div');
-    if (black(n)) { el.className = 'k2'; el.style.left = `calc(10px + ${(w - .32) / whites} * (100% - 20px))`; el.style.width = `calc(${.64 / whites} * (100% - 20px))`; }
-    else { el.className = 'w'; el.style.left = `calc(10px + ${w / whites} * (100% - 20px) + 2px)`; el.style.width = `calc(${1 / whites} * (100% - 20px) - 4px)`; w++; }
-    el.dataset.n = n; keys.appendChild(el); keyEl[n] = el;
+/* ---- the FM-1's geometry (as in the mockup) */
+const KEYN = ['F','F#','G','G#','A','A#','B','C','C#','D','D#','E'];
+const KEYS = Array.from({length: 27}, (_, n) => ({n, name: KEYN[n % 12], oct: 3 + Math.floor((n + 5) / 12), black: KEYN[n % 12].includes('#')}));
+function keybed(x0, y0, width, wW, wH, bW, bH, gapY) {
+  const W_ = KEYS.filter(k => !k.black), B_ = KEYS.filter(k => k.black), step = width / W_.length, out = {};
+  W_.forEach((k, i) => { out['key:' + k.n] = [x0 + i * step + (step - wW) / 2, y0 + bH + gapY, wW, wH]; });
+  B_.forEach(k => { const left = W_.findIndex(w => w.n === k.n - 1); out['key:' + k.n] = [x0 + (left + 1) * step - bW / 2, y0, bW, bH]; });
+  return out;
+}
+const ROWS = [['FX','SEL','ENV','LFO','EDIT','GLO'], ['HOME','SAVE','ARP','SEQ','PLAY','REC']];
+const buttonRows = (rows, x0, y0, size, step, rowStep) => { const o = {}; rows.forEach((r, j) => r.forEach((l, i) => { o['btn:' + l] = [x0 + i * step, y0 + j * rowStep, size, size]; })); return o; };
+const kn = (cx, cy, d = 46) => [cx - d / 2, cy - d / 2, d, d];
+const LAYOUTS = {
+  landscape: {W: 1000, H: 620, above: true, brand: [56, 16],
+    deco: {bezel: [270, 36, 268, 268], oct: [52, 262, 196, 64], buttons: [572, 158, 394, 156], keys: [40, 336, 920, 262]},
+    lcd: [284, 50, 240, 240],
+    enc: {MASTER: kn(95, 108), SELECT: kn(195, 108), PRESETS: kn(95, 214), ALGORITHM: kn(195, 214), K1: kn(632, 108), K2: kn(731, 108), K3: kn(830, 108), K4: kn(929, 108)},
+    ctl: {...buttonRows(ROWS, 588, 174, 52, 62, 68), 'btn:OCT-': [66, 275, 76, 38], 'btn:OCT+': [158, 275, 76, 38], ...keybed(60, 350, 880, 47, 122, 44, 100, 14)}},
+  portrait: {W: 420, H: 772, above: false, brand: [18, 288],
+    deco: {bezel: [76, 20, 268, 268], buttons: [14, 450, 392, 128], keys: [10, 590, 400, 172]},
+    lcd: [90, 34, 240, 240],
+    enc: {MASTER: kn(60, 340), SELECT: kn(160, 340), ALGORITHM: kn(260, 340), PRESETS: kn(360, 340), K1: kn(60, 416), K2: kn(160, 416), K3: kn(260, 416), K4: kn(360, 416)},
+    ctl: {...buttonRows([[...ROWS[0], 'OCT-'], [...ROWS[1], 'OCT+']], 25, 462, 46, 54, 58), ...keybed(16, 598, 388, 20, 76, 20, 72, 6)}}
+};
+const place = (el, [x, y, w, h]) => { el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = w + 'px'; el.style.height = h + 'px'; };
+
+const lcd = document.createElement('canvas');
+lcd.id = 'lcd'; lcd.width = 240; lcd.height = 240; lcd.setAttribute('aria-label', 'The FM-1 screen');
+const g = lcd.getContext('2d');
+const startBtn = document.createElement('button');
+startBtn.className = 'start'; startBtn.type = 'button';
+startBtn.innerHTML = '▶ Start<small>the Veffbox firmware, in your browser, with sound</small>';
+const tag = document.createElement('div');
+tag.className = 'tag'; tag.hidden = true;
+const btnEl = {}, keyEl = [], encEl = {}, rot = {MASTER: 60};
+
+function build() {
+  const vw = document.documentElement.clientWidth || innerWidth, L = LAYOUTS[vw < 700 ? 'portrait' : 'landscape'];
+  if (LAY !== L) {
+    LAY = L;
+    const dev = $('dev');
+    dev.innerHTML = ''; dev.style.width = L.W + 'px'; dev.style.height = L.H + 'px';
+    for (const [k, b] of Object.entries(L.deco)) { const d = document.createElement('div'); d.className = k === 'bezel' ? 'bezel' : 'tray'; d.dataset.deco = k; place(d, b); dev.append(d); }
+    const br = document.createElement('div'); br.className = 'brand'; br.textContent = 'Veffbox';
+    br.style.left = L.brand[0] + 'px'; br.style.top = L.brand[1] + 'px'; dev.append(br);
+    place(lcd, L.lcd); dev.append(lcd);
+    place(startBtn, L.lcd); dev.append(startBtn);
+    for (const [k, b] of Object.entries(L.enc)) {
+      const el = document.createElement('div');
+      el.className = 'knob' + (k[0] === 'K' ? ' k' : ''); el.dataset.enc = k; place(el, b);
+      el.innerHTML = `<div class="kb"><i></i></div><div class="kl" style="${L.above ? 'bottom:52px' : 'top:49px'}">${L.above ? `<small>${ENC_SMALL[k]}</small>` : ''}<b>${ENC_NAME[k]}</b></div>`;
+      el.querySelector('i').style.setProperty('--r', (rot[k] || 0) + 'deg');
+      dev.append(el); encEl[k] = el; bindEnc(el, k);
+    }
+    for (const [k, b] of Object.entries(L.ctl)) {
+      const [kind, id] = k.split(':'), el = document.createElement('div'); place(el, b);
+      if (kind === 'btn') {
+        el.className = 'b' + (id === 'REC' ? ' rec' : ''); el.dataset.btn = id;
+        el.innerHTML = `<b>${id}</b><small>${SUB[id] || ''}</small>`; btnEl[BTN.indexOf(id)] = el;
+      } else {
+        const key = KEYS[+id]; el.className = 'key ' + (key.black ? 'k2' : 'w'); el.dataset.n = id;
+        if (L.above && key.name === 'C') el.innerHTML = `<span class="kn">C${key.oct}</span>`;
+        keyEl[+id] = el;
+      }
+      dev.append(el);
+    }
+    dev.append(tag);
+    showStep();
   }
-})();
-const held = new Set();
-const keyDown = n => { if (!M || held.has(n)) return; held.add(n); M._emu_key(n, 1); keyEl[n].classList.add('down'); };
-const keyUp = n => { if (!M || !held.has(n)) return; held.delete(n); M._emu_key(n, 0); keyEl[n].classList.remove('down'); };
-const ptrKey = new Map();
-keys.addEventListener('pointerdown', e => { const n = e.target.dataset.n; if (n === undefined) return; keys.setPointerCapture(e.pointerId); ptrKey.set(e.pointerId, +n); keyDown(+n); });
-keys.addEventListener('pointermove', e => { if (!ptrKey.has(e.pointerId)) return; const t = document.elementFromPoint(e.clientX, e.clientY), n = t && t.dataset ? t.dataset.n : undefined;
-  if (n !== undefined && +n !== ptrKey.get(e.pointerId)) { keyUp(ptrKey.get(e.pointerId)); ptrKey.set(e.pointerId, +n); keyDown(+n); } });
-const ptrEnd = e => { if (ptrKey.has(e.pointerId)) { keyUp(ptrKey.get(e.pointerId)); ptrKey.delete(e.pointerId); } };
-keys.addEventListener('pointerup', ptrEnd); keys.addEventListener('pointercancel', ptrEnd);
+  const sc = Math.min((Math.min(vw, 1360) - 32) / L.W, 1.3);
+  $('dev').style.transform = `scale(${sc})`; $('devWrap').style.width = L.W * sc + 'px'; $('devWrap').style.height = L.H * sc + 'px';
+}
 
-/* computer keyboard */
+/* ---- input */
+function encTurn(k, d) {
+  if (!M || !d) return;
+  rot[k] = (rot[k] || 0) + d * 15;
+  encEl[k].querySelector('i').style.setProperty('--r', rot[k] + 'deg');
+  if (k === 'MASTER') { vol = Math.max(0, Math.min(4095, vol + d * 128)); M._emu_master(vol); return; }
+  M._emu_encoder(ENC_ID[k], d);
+  tourEvent('enc:' + k);
+}
+function bindEnc(el, k) {
+  let y0 = null, acc = 0;
+  el.addEventListener('pointerdown', e => { y0 = e.clientY; acc = 0; el.setPointerCapture(e.pointerId); e.preventDefault(); });
+  el.addEventListener('pointermove', e => { if (y0 === null) return; acc += y0 - e.clientY; y0 = e.clientY;
+    const d = Math.trunc(acc / 10); if (d) { acc -= d * 10; encTurn(k, d); } });
+  const end = () => { y0 = null; };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('wheel', e => { e.preventDefault(); encTurn(k, e.deltaY < 0 ? 1 : -1); }, {passive: false});
+}
+function btn(i, down) {
+  if (!M || i < 0) return;
+  M._emu_button(i, down ? 1 : 0);
+  if (btnEl[i]) btnEl[i].classList.toggle('down', !!down);
+  if (down) tourEvent('btn:' + BTN[i]);
+}
+const held = new Set();
+const keyDown = n => { if (!M || held.has(n)) return; held.add(n); M._emu_key(n, 1); keyEl[n].classList.add('down'); tourEvent('key'); };
+const keyUp = n => { if (!M || !held.has(n)) return; held.delete(n); M._emu_key(n, 0); keyEl[n].classList.remove('down'); };
+const ptr = new Map();             /* pointer -> {btn} or {key} */
+const dev = $('dev');
+dev.addEventListener('pointerdown', e => {
+  const b = e.target.closest('[data-btn]');
+  if (b) { e.preventDefault(); const i = BTN.indexOf(b.dataset.btn); ptr.set(e.pointerId, {btn: i}); btn(i, 1); return; }
+  const k = e.target.closest('[data-n]');
+  if (k) { e.preventDefault(); dev.setPointerCapture(e.pointerId); ptr.set(e.pointerId, {key: +k.dataset.n}); keyDown(+k.dataset.n); }
+});
+dev.addEventListener('pointermove', e => {
+  const p = ptr.get(e.pointerId); if (!p || p.key === undefined) return;
+  const t = document.elementFromPoint(e.clientX, e.clientY), k = t && t.closest ? t.closest('[data-n]') : null;
+  if (k && +k.dataset.n !== p.key) { keyUp(p.key); p.key = +k.dataset.n; keyDown(p.key); }
+});
+const ptrEnd = e => { const p = ptr.get(e.pointerId); if (!p) return; ptr.delete(e.pointerId); if (p.btn !== undefined) btn(p.btn, 0); else keyUp(p.key); };
+dev.addEventListener('pointerup', ptrEnd); dev.addEventListener('pointercancel', ptrEnd);
+
 const KB_BTN = {' ': 'PLAY', Enter: 'REC', '\\': 'SEL', ArrowLeft: 'OCT-', ArrowRight: 'OCT+'};
 addEventListener('keydown', e => {
   if (!M || e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (k === '[' || k === ']') { M._emu_encoder(0, k === ']' ? 1 : -1); e.preventDefault(); return; }
-  if (KB_BTN[k]) { e.preventDefault(); if (!e.repeat) { const i = BTN.indexOf(KB_BTN[k]); M._emu_button(i, 1); btnEl[i].classList.add('down'); } return; }
+  if (k === '[' || k === ']') { encTurn('SELECT', k === ']' ? 1 : -1); e.preventDefault(); return; }
+  if (KB_BTN[k]) { e.preventDefault(); if (!e.repeat) btn(BTN.indexOf(KB_BTN[k]), 1); return; }
   const n = KEYMAP.indexOf(k); if (n >= 0 && !e.repeat) { keyDown(n); e.preventDefault(); }
 });
 addEventListener('keyup', e => {
   if (!M) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (KB_BTN[k]) { const i = BTN.indexOf(KB_BTN[k]); M._emu_button(i, 0); btnEl[i].classList.remove('down'); return; }
+  if (KB_BTN[k]) { btn(BTN.indexOf(KB_BTN[k]), 0); return; }
   const n = KEYMAP.indexOf(k); if (n >= 0) keyUp(n);
 });
-$('vol').addEventListener('input', e => { if (M) M._emu_master(+e.target.value); });
+
+/* ---- step by step: what to press next, and why, in one sentence */
+const STEPS = [
+  {at: 'start', t: 'Press <kbd>▶ Start</kbd> on the screen', w: 'This is the Veffbox firmware itself, running in your browser with sound.'},
+  {at: 'btn:EDIT', t: 'Press <kbd>EDIT</kbd>', w: 'EDIT opens the source: the engine that makes the raw sound.'},
+  {at: 'enc:SELECT', t: 'Turn <kbd>SELECT</kbd>', w: 'SELECT picks the engine, OP4 (FM), ANLG (analog) or DRUM, and any of them is a good start.'},
+  {at: 'btn:SEL', t: 'Press <kbd>SEL</kbd>, a few times', w: 'On the source page SEL rolls random engine settings; hold it to go back.'},
+  {at: 'key', t: 'Play a few keys', w: 'Hear what you rolled (Z S X D C on your computer keyboard play too).'},
+  {at: 'btn:FX', t: 'Press <kbd>FX</kbd>', w: 'Up to eight effects run in a chain after the source.'},
+  {at: 'btn:SEL', t: 'Press <kbd>SEL</kbd>', w: 'SEL scrambles a whole new effect chain, with LFOs already moving it.'},
+  {at: 'btn:LFO', t: 'Press <kbd>LFO</kbd>', w: 'LFOs and envelopes move parameters over time, so the sound breathes.'},
+  {at: 'btn:SEL', t: 'Press <kbd>SEL</kbd>', w: 'SEL gives this LFO a random shape, speed and destination; SELECT picks another one to roll.'},
+  {at: 'key', t: 'Play it again', w: 'The same notes, now with the effects and the movement on top.'},
+  {at: 'btn:REC', t: 'Press <kbd>REC</kbd> to resample', w: 'REC records the whole chain, source, effects and modulation, into one new sample.'},
+  {at: 'btn:EDIT', t: 'Press <kbd>EDIT</kbd>', w: 'The recording is now the source (SAMP), and the effects and LFOs start empty again.'},
+  {at: 'enc:SELECT', t: 'Turn <kbd>SELECT</kbd> to GRAN or CHOP', w: 'GRAN plays the resample as a cloud of grains, CHOP cuts it into slices across the keys.'},
+  {at: 'btn:SEL', t: 'Press <kbd>SEL</kbd>', w: 'SEL rolls the sampler too: grain size, density, pitch, or how it slices.'},
+  {at: 'btn:FX', also: 'btn:SEL', t: 'Press <kbd>FX</kbd>, then <kbd>SEL</kbd>', w: 'New effects on a resample of effects is where a sound turns into something new.'},
+  {at: 'btn:REC', t: 'Press <kbd>REC</kbd> again', w: 'Each resample is a new generation, a child of the one before.'},
+  {at: 'btn:SAVE', t: 'Press <kbd>SAVE</kbd>', w: 'This is the tree: every generation keeps its recipe, so you can always load it, edit it or rebuild it.'},
+  {at: 'btn:ARP', t: 'Press <kbd>ARP</kbd>', w: 'ARP opens the player; with MODE on CHORD it strums a sequence of up to 16 chords.'},
+  {at: 'btn:PLAY', t: 'Press <kbd>PLAY</kbd>', w: 'The chord sequence now plays through your sound.'},
+  {at: 'btn:ARP', t: 'Press <kbd>ARP</kbd> again', w: 'The next row edits the selected chord: ROOT, TYPE, LEN and GATE.'},
+  {at: 'enc:K2', t: 'Turn <kbd>KNOB 2</kbd>', w: 'KNOB 2 is TYPE (maj7, m9, 6/9…), and SELECT picks which chord you are editing.'},
+  {at: 'end', t: 'That is the loop', w: 'Make a sound, resample it, make it new, again; everything saves itself, and PRESETS starts the next sound.'}
+];
+let tourOn = false, step = 0, sub = false;
+const T = {n: $('tn'), t: $('tt'), w: $('tw'), bar: $('tbar'), back: $('tback'), skip: $('tskip')};
+function targetEl(at) {
+  if (at === 'start') return startBtn;
+  if (at === 'key') return document.querySelector('[data-deco=keys]');
+  const [k, id] = at.split(':');
+  return k === 'btn' ? btnEl[BTN.indexOf(id)] : k === 'enc' ? encEl[id] : null;
+}
+function showStep() {
+  document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
+  tag.hidden = true;
+  $('tour').hidden = !tourOn;
+  if (!tourOn) return;
+  if (step === 0 && M) step = 1;
+  const s = STEPS[step], last = step === STEPS.length - 1;
+  T.n.textContent = last ? 'Done' : `${step + 1} / ${STEPS.length - 1}`;
+  T.t.innerHTML = s.t; T.w.textContent = s.w;
+  T.bar.style.width = (100 * step / (STEPS.length - 1)) + '%';
+  T.back.hidden = step <= 1;
+  T.skip.textContent = last ? 'Start over' : 'Skip'; T.skip.className = last ? 'go' : '';
+  const at = sub ? s.also : s.at, el = targetEl(at);
+  if (!el) return;
+  el.classList.add('hl');
+  if (at === 'start') return;
+  /* a label next to the control, in the panel's own coordinates */
+  const x = parseFloat(el.style.left) + parseFloat(el.style.width) / 2, y = parseFloat(el.style.top), h = parseFloat(el.style.height);
+  tag.textContent = at === 'key' ? 'play' : at.startsWith('enc') ? 'turn' : 'press';
+  tag.hidden = false;
+  tag.style.left = x + 'px';
+  const up = at === 'key' || ROWS[0].includes(at.slice(4));        /* the top button row: above it, off the row below */
+  tag.style.top = (up ? y - 36 : y + h + 12) + 'px';
+}
+function tourEvent(ev) {
+  if (!tourOn) return;
+  const s = STEPS[step];
+  if (s.also && !sub) { if (ev === s.at) { sub = true; showStep(); } return; }
+  if (ev === (sub ? s.also : s.at)) next();
+}
+function next() { sub = false; if (step < STEPS.length - 1) { step++; setTimeout(showStep, 150); } }
+T.skip.addEventListener('click', () => { sub = false; if (step === STEPS.length - 1) step = M ? 1 : 0; else step++; showStep(); });
+T.back.addEventListener('click', () => { sub = false; if (step > 1) step--; showStep(); });
+function setTour() { tourOn = location.hash.includes('tour'); showStep(); }
+addEventListener('hashchange', setTour);
 
 /* ---- the bank in this browser */
 const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
@@ -173,18 +327,18 @@ function frame(t) {
     d[o] = (c >> 11) * 255 / 31; d[o + 1] = ((c >> 5) & 63) * 255 / 63; d[o + 2] = (c & 31) * 255 / 31; d[o + 3] = 255;
   }
   g.putImageData(img, 0, 0);
-  for (let i = 0; i < BTN.length; i++) btnEl[i].classList.toggle('on', !!M._emu_led(i));
+  for (let i = 0; i < BTN.length; i++) if (btnEl[i]) btnEl[i].classList.toggle('on', !!M._emu_led(i));
   const w = M._emu_flash_writes();
   if (w !== flashSeen && t - lastSave > 1500) { flashSeen = w; lastSave = t; saveFlash(); }
-  raf = requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
 async function start() {
-  const btn = $('start');
-  btn.disabled = true; btn.firstChild.textContent = 'Loading…';
+  if (M) return;
+  startBtn.disabled = true; startBtn.firstChild.textContent = 'Loading…';
   try {
     M = await Veffbox();
     M._emu_init(loadFlash() ? 1 : 0);
-    M._emu_master(+$('vol').value);
+    M._emu_master(vol);
     flashSeen = M._emu_flash_writes();
     img = g.createImageData(240, 240);
     ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100});
@@ -195,16 +349,22 @@ async function start() {
       e.outputBuffer.getChannelData(0).set(src); e.outputBuffer.getChannelData(1).set(src);
     };
     node.connect(ctx.destination);
-    btn.hidden = true;
-    raf = requestAnimationFrame(frame);
+    startBtn.hidden = true;
+    requestAnimationFrame(frame);
+    if (step === 0) next();
   } catch (err) {
-    btn.disabled = false; btn.innerHTML = `<span class="err">Could not start</span><small>${String(err.message || err)}</small>`;
+    M = null; startBtn.disabled = false;
+    startBtn.innerHTML = `<span class="err">Could not start</span><small>${String(err.message || err)}</small>`;
   }
 }
-$('start').addEventListener('click', start);
-if (location.hash === '#autostart') start();        /* (tests and links that already had a click) */
+startBtn.addEventListener('click', start);
 document.addEventListener('visibilitychange', () => { if (!ctx) return; document.hidden ? (saveFlash(), ctx.suspend()) : ctx.resume(); });
 addEventListener('pagehide', () => { if (M) saveFlash(); });
+addEventListener('resize', build);
+if (window.top !== window) document.querySelector('.help').hidden = true;   /* the site shows its own line under the frame */
+build();
+setTour();
+if (location.hash.includes('autostart')) start();        /* (tests and links that already had a click) */
 })();
 </script>
 </body>

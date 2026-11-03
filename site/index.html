@@ -390,11 +390,12 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <h3 id="try-title">Play it right here.</h3>
       </div>
       <p>The <b>emulator</b> runs the Veffbox firmware itself in your browser: the same screen, the same engines, the same
-        sound, and your bank is kept in this browser. The <b>mockup</b> is silent but explains every click.</p>
+        sound, and your bank is kept in this browser. <b>Step by step</b> lights up what to press next and says why, from
+        the first sound to a resample, the tree and a chord sequence.</p>
     </div>
     <div class="tabs" role="tablist">
-      <button type="button" role="tab" aria-selected="true" data-src="emu/index.html" data-k="emu">Emulator · with sound</button>
-      <button type="button" role="tab" aria-selected="false" data-src="demo/index.html#t4/SRC" data-k="demo">Mockup · explains every click</button>
+      <button type="button" role="tab" aria-selected="true" data-src="emu/index.html#play">Emulator</button>
+      <button type="button" role="tab" aria-selected="false" data-src="emu/index.html#tour">Step by step · make your own sound</button>
     </div>
     <div class="frame">
       <iframe id="demo" class="emu" src="emu/index.html" title="Veffbox emulator: the firmware in the browser" loading="eager" allow="autoplay"></iframe>
@@ -409,7 +410,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
 (() => { const f = document.getElementById('demo'), full = document.getElementById('full');
   document.querySelectorAll('.tabs [role=tab]').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('.tabs [role=tab]').forEach(x => x.setAttribute('aria-selected', x === b));
-    f.src = b.dataset.src; f.className = b.dataset.k; full.href = b.dataset.src.split('#')[0]; })); })();
+    f.src = b.dataset.src; full.href = b.dataset.src; })); })();
 </script>
 
 <!-- GUIDE -->
@@ -813,7 +814,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
             <text x="565" y="158" font-size="12" fill="#f4d9ea" text-anchor="middle" opacity=".7">G0 → G1 → G2 → G4</text>
           </g>
         </svg>
-        <div class="tree-legend"><span><i></i>rebuild path</span><span><i class="d"></i>another branch</span><span>GRIT PAD, from the mockup's bank</span></div>
+        <div class="tree-legend"><span><i></i>rebuild path</span><span><i class="d"></i>another branch</span><span>GRIT PAD, an example sound</span></div>
       </div>
     </div>
 
@@ -900,10 +901,9 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
   <div class="wrap">
     <div class="s-head">
       <span class="num">10 · Status</span>
-      <h2 id="status-title">Early, and honest about it.</h2>
-      <p class="lead">The interface above is a clickable mockup without sound. The firmware runs on the FM&#8209;1
-        today: every page of the mockup, built in portable integer C that is tested on a computer before it reaches
-        the hardware.</p>
+      <h2 id="status-title">Running on the FM&#8209;1 today.</h2>
+      <p class="lead">The emulator above is the firmware itself, compiled for the browser. It is portable integer C,
+        tested on a computer before it reaches the hardware, and installed on an FM&#8209;1 from the page below.</p>
     </div>
     <div class="status-grid">
       <div class="card now-card">
@@ -921,13 +921,14 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         </ul>
       </div>
       <ol class="miles">
-        <li><span class="m">M0</span><span class="t">Mockup <span class="tag ok">done</span></span><span class="d">Every page, every button, the bank tree. The panel at the top of this page.</span></li>
+        <li><span class="m">M0</span><span class="t">Mockup <span class="tag ok">done</span></span><span class="d">Every page, every button, the bank tree, designed before the firmware.</span></li>
         <li><span class="m">M1</span><span class="t">Portable core <span class="tag ok">done</span></span><span class="d">Six engines, 13 effects, modulation, the player, flash formats. Host tests for repeatability and overflow.</span></li>
         <li><span class="m">M2</span><span class="t">Platform <span class="tag ok">done</span></span><span class="d">MNM-1's hardware layer, loader and tools; its own identity, FM-1_62000100.</span></li>
         <li><span class="m">M3</span><span class="t">UI on the device <span class="tag ok">done</span></span><span class="d">Pages, rows, SELECT and SEL, RANDOMIZE and SCRAMBLE with undo, LEARN.</span></li>
         <li><span class="m">M4</span><span class="t">RESAMPLE <span class="tag ok">done</span></span><span class="d">The chain renders into RAM (1.67 s); SAMP, GRAN and CHOP play it.</span></li>
         <li><span class="m">M5</span><span class="t">Bank <span class="tag ok">done</span></span><span class="d">64 sounds and their generations in flash, LOAD, EDIT, REBUILD.</span></li>
-        <li><span class="m">M6</span><span class="t">Next</span><span class="d">Four tracks sounding at once, PITCH as a modulation target, longer resamples, and the core in the browser so this page plays the real sound.</span></li>
+        <li><span class="m">M6</span><span class="t">In the browser <span class="tag ok">done</span></span><span class="d">The firmware as WebAssembly: the emulator and the step-by-step guide at the top of this page.</span></li>
+        <li><span class="m">M7</span><span class="t">Next</span><span class="d">Four tracks sounding at once, PITCH as a modulation target, longer resamples, sidechain and spectral effects.</span></li>
       </ol>
     </div>
   </div>
@@ -992,7 +993,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <h4>Links</h4>
         <ul>
           <li><a href="https://github.com/galfaroth/veffbox">Source code on GitHub</a></li>
-          <li><a href="demo/index.html">The interface, full screen</a></li>
+          <li><a href="emu/index.html#tour">The emulator, full screen, step by step</a></li>
           <li><a href="https://galfaroth.github.io/mnm1/">MNM-1, the sibling firmware</a></li>
           <li><a href="#install">Install</a></li>
         </ul>
