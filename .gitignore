@@ -4,3 +4,6 @@ host/out/
 .DS_Store
 build-fm1/
 dist/
+host/shot
+host/shots/
+*.dSYM/

@@ -6,7 +6,8 @@
  *   LFO   MOD L1..L6   ENV  MOD E1..E3                            SEL = LEARN a destination (then turn any knob)
  *   FX    the 8-slot chain                                        SEL = SCRAMBLE, hold SEL = undo
  *   HOME  PRINT settings   REC  PRINT from any page               SAVE BANK (generations)   GLO tempo, CHAOS
- *   SELECT the item on the page, ALGORITHM the track, PRESETS the bank sound, OCT- / OCT+ the keys' octave,
+ *   SELECT the engine on SRC (the keys pick the DRUM voice; OP4's operator is the OP knob), the item on the other
+ *   pages, ALGORITHM the track, PRESETS the bank sound, OCT- / OCT+ the keys' octave,
  *   OCT- + OCT+ held 5 s: UBOOT.
  * Pressing the page's button again steps through its rows; KNOB 1-4 edit the lit row. */
 
@@ -104,7 +105,7 @@ static void vb_all_off(void) { vb_player_panic(&vb_pl); }
 enum { PG_SRC, PG_PLAY, PG_MOD, PG_FX, PG_PRINT, PG_BANK, PG_GLO, NPG };
 static const char *const PG_NAME[NPG] = {"SRC", "PLAY", "MOD", "FX", "PRINT", "BANK", "GLO"};
 static struct {
-    uint8_t page, row[NPG], track, op, dvoice, oct, chaos, bank_do;
+    uint8_t page, row[NPG], track, op, opsel, dvoice, oct, chaos, bank_do;
     int8_t learn_src, learn_slot;
     uint8_t force, d_hdr, d_vis, d_prm, printing, undo_ok;
     uint32_t vis_due, msg_until, sel_t0, rolls, rng;
@@ -388,7 +389,7 @@ static void vb_init(void)
 
 /* ---- cells: what a knob edits */
 enum { F_NUM, F_LIST, F_S24, F_S64, F_PCT, F_NOTE, F_LEN, F_HALF, F_DEST, F_AMT, F_HZ };
-enum { K_U8, K_SRC, K_ROOT, K_CTYPE, K_CNOTE, K_FXTYPE, K_MOVE, K_DEST, K_AMT, K_BPM, K_CHAOS, K_SOUND, K_GEN, K_DO, K_STEPS };
+enum { K_U8, K_ROOT, K_CTYPE, K_CNOTE, K_FXTYPE, K_MOVE, K_DEST, K_AMT, K_BPM, K_CHAOS, K_SOUND, K_GEN, K_DO, K_STEPS };
 typedef struct {
     const char *label;
     uint8_t kind, fmt;
@@ -423,6 +424,7 @@ static void cd(uint32_t r, uint32_t c, const vb_param_t *d, uint8_t *p, vb_addr_
 }
 
 static const char *const SRC_N[6] = {"OP4", "ANLG", "DRUM", "SAMP", "GRAN", "CHOP"};
+static const char *const OP_N[4] = {"A", "B", "C", "D"};
 static const char *const MODE_N[3] = {"NOTE", "SEQ", "CHORD"};
 static const char *const RATE_N[4] = {"1/4", "1/8", "1/16", "1/16"};
 static const char *const ONOFF_N[2] = {"OFF", "ON"};
@@ -456,29 +458,25 @@ static void build_rows(void)
                     if (k == 255u)
                         continue;
                     if (k < 9u)
-                        k += ui.op * 9u;
+                        k += (ui.opsel & 3u) * 9u;
                     cd(r, c, &vb_op4.desc.params[k], &RC->op4[k], VB_ADDR(VB_D_OP4, k));
                 }
-            cl(2, 3, "SRC", K_SRC, F_LIST, &RC->src, 0, 5, SRC_N, VB_ADDR_NONE, 0);
+            cl(2, 3, "OP", K_U8, F_LIST, &ui.opsel, 0, 3, OP_N, VB_ADDR_NONE, 0);
             NR = 3;
         } else if (RC->src == VB_SRC_ANLG) {
             for (r = 0; r < 4u; r++)
                 for (c = 0; c < 4u; c++)
                     cd(r, c, &vb_anlg.desc.params[r * 4 + c], &RC->anlg[r * 4 + c], VB_ADDR(VB_D_ANLG, r * 4 + c));
-            cl(4, 0, "SRC", K_SRC, F_LIST, &RC->src, 0, 5, SRC_N, VB_ADDR_NONE, 0);
-            NR = 5;
+            NR = 4;
         } else if (RC->src == VB_SRC_DRUM) {
             uint32_t v = ui.dvoice, i;
             const vb_drum_voice_desc_t *d = &vb_drum_voices[v];
             static const char *const VN[8] = {"KICK", "SNARE", "CLAP", "HAT", "TOM", "RIM", "COWB", "CYMB"};
-            cl(0, 0, "VOICE", K_U8, F_LIST, &ui.dvoice, 0, 7, VN, VB_ADDR_NONE, 0);
-            cl(0, 1, "LEVEL", K_U8, F_NUM, &RC->drum.lvl[v], 0, 127, 0, VB_ADDR(VB_D_DRUM, v * 9 + 8), 0);
-            for (i = 0; i < 8u; i++) {
-                uint32_t at = i + 2u;
-                cl(at / 4u, at % 4u, d->p[i].label, K_U8, F_NUM, &RC->drum.p[v][i], 0, 127, 0,
+            for (i = 0; i < 8u; i++)
+                cl(i / 4u, i % 4u, d->p[i].label, K_U8, F_NUM, &RC->drum.p[v][i], 0, 127, 0,
                    VB_ADDR(VB_D_DRUM, v * 9 + i), 0);
-            }
-            cl(2, 3, "SRC", K_SRC, F_LIST, &RC->src, 0, 5, SRC_N, VB_ADDR_NONE, 0);
+            cl(2, 0, "LEVEL", K_U8, F_NUM, &RC->drum.lvl[v], 0, 127, 0, VB_ADDR(VB_D_DRUM, v * 9 + 8), 0);
+            cl(2, 1, "VOICE", K_U8, F_LIST, &ui.dvoice, 0, 7, VN, VB_ADDR_NONE, 0);
             NR = 3;
         } else if (RC->src == VB_SRC_GRAN || RC->src == VB_SRC_CHOP) {
             const vb_engine_t *e = RC->src == VB_SRC_GRAN ? &vb_gran : &vb_chop;
@@ -486,16 +484,14 @@ static void build_rows(void)
             uint32_t i, dom = RC->src == VB_SRC_GRAN ? VB_D_GRAN : VB_D_CHOP;
             for (i = 0; i < e->desc.nparams; i++)
                 cd(i / 4u, i % 4u, &e->desc.params[i], &base[i], VB_ADDR(dom, i));
-            cl(2, 3, "SRC", K_SRC, F_LIST, &RC->src, 0, 5, SRC_N, VB_ADDR_NONE, 0);
-            NR = 3;
+            NR = (e->desc.nparams + 3u) / 4u;
         } else {
             uint32_t i;
             for (i = 0; i < 8u; i++)
                 cl(i / 4u, i % 4u, SAMP_LBL[i], K_U8, i == 2 ? F_LIST : i == 3 ? F_LIST : i == 4 ? F_S24 : i == 5 ? F_S64 : F_NUM,
                    &RC->samp[i], i == 1 ? 1 : 0, i == 0 ? 126 : i == 2 ? 2 : i == 3 ? 1 : i == 4 ? 48 : i == 5 ? 99 : 127,
                    i == 2 ? SAMP_LOOP_N : i == 3 ? ONOFF_N : 0, (i == 2 || i == 3) ? VB_ADDR_NONE : VB_ADDR(VB_D_SAMP, i), 0);
-            cl(2, 0, "SRC", K_SRC, F_LIST, &RC->src, 0, 5, SRC_N, VB_ADDR_NONE, 0);
-            NR = 3;
+            NR = 2;
         }
         break;
     case PG_PLAY:
@@ -695,11 +691,6 @@ static void cell_set(const cell_t *x, int v)
     vb_chord_t *ch = &RC->play.chord[RC->play.sel % VB_CHORD_STEPS];
     v = clampi(v, x->min, x->max);
     switch (x->kind) {
-    case K_SRC:
-        RC->src = (uint8_t)v;
-        ui.row[PG_SRC] = 0;
-        dirty();
-        return;
     case K_ROOT: {                                         /* moves the whole voicing */
         int d = v - ch->root, i;
         for (i = 0; i < ch->n; i++)
@@ -1165,12 +1156,17 @@ static void vb_input(void)
     if ((d = panel_enc(EN_SELECT)) != 0) {
         int s = d > 0 ? 1 : -1;
         switch (ui.page) {
-        case PG_SRC:
-            if (RC->src == VB_SRC_OP4)
-                ui.op = (uint8_t)clampi(ui.op + s, 0, 3);
-            else if (RC->src == VB_SRC_DRUM)
-                ui.dvoice = (uint8_t)clampi(ui.dvoice + s, 0, 7);
+        case PG_SRC: {                                     /* the engine (the keys pick a DRUM voice) */
+            int v = clampi(RC->src + s, 0, 5);
+            if (v != RC->src) {
+                RC->src = (uint8_t)v;
+                ui.row[PG_SRC] = 0;
+                ui.undo_ok = 0;
+                say(SRC_N[v]);
+                touch();
+            }
             break;
+        }
         case PG_PLAY:
             RC->play.sel = (uint8_t)clampi(RC->play.sel + s, 0, (RC->play.mode == VB_PLAY_SEQ ? VB_SEQ_STEPS : VB_CHORD_STEPS) - 1);
             break;
@@ -1333,9 +1329,10 @@ static void text_c(int32_t x, int32_t w, int32_t y, uint32_t sc, const char *s, 
 }
 static void text_fit(int32_t x, int32_t w, int32_t y, uint32_t sc, const char *s, uint16_t c)   /* shrinks to fit */
 {
+    uint32_t want = sc;                                    /* y is the top of the text at the size asked for */
     while (sc > 1u && md_text_w(&MD_F3, sc, s) > w - 4)
         sc--;
-    text_c(x, w, y + (int32_t)(4u - sc) * 3, sc, s, c);
+    text_c(x, w, y + (int32_t)(want - sc) * 5 / 2, sc, s, c);
 }
 
 static void draw_hdr(void)
@@ -1377,12 +1374,12 @@ static void chips(const char *const *names, uint32_t n, uint32_t sel, uint32_t l
     for (i = 0; i < n; i++) {
         int32_t x = 4 + (int32_t)(i * w);
         int s = i == sel;
-        cv_rect(x, 4, (int32_t)w - 3, 18, C_INK);
+        cv_rect(x, 3, (int32_t)w - 3, 22, C_INK);          /* 22 high: the 2x text (10 px) in the middle */
         if (!s)
-            cv_rect(x + 2, 6, (int32_t)w - 7, 14, C_BG);
+            cv_rect(x + 2, 5, (int32_t)w - 7, 18, C_BG);
         if (!s && ((lit_mask >> i) & 1u))
-            cv_rect(x + 2, 17, (int32_t)w - 7, 3, C_INK);
-        text_fit(x, (int32_t)w - 3, 8, 2, names[i], s ? C_BG : C_INK);
+            cv_rect(x + 2, 21, (int32_t)w - 7, 2, C_INK);
+        text_fit(x, (int32_t)w - 3, 9, 2, names[i], s ? C_BG : C_INK);
     }
 }
 
@@ -1456,13 +1453,14 @@ static void vis_op4(void)
 {
     /* the algorithm as text and the selected operator, large */
     char t[24];
-    const uint8_t *o = &RC->op4[ui.op * 9u];
+    uint32_t op = ui.opsel & 3u;
+    const uint8_t *o = &RC->op4[op * 9u];
     static const char *const OPL[4] = {"A", "B", "C", "D"};
     static const char *const ALG_TXT[11] = {"D>C>B>A", "C+D>B>A", "D>C>A B>A", "D>B>A C>A", "D>C>B  A", "D>C  B>A",
                                             "D>A,B,C", "D>C  A  B", "B+C+D>A", "D>C>A,B", "A B C D"};
-    chips(OPL, 4, ui.op, 0);
-    md_text(12, 34, &MD_F3, 9, OPL[ui.op], C_INK);
-    str_cpy(t, vb_op4.desc.params[ui.op * 9u].names ? vb_op4.desc.params[ui.op * 9u].names[o[0]] : "SIN", sizeof t);
+    chips(OPL, 4, op, 0);
+    md_text(12, 34, &MD_F3, 9, OPL[op], C_INK);
+    str_cpy(t, vb_op4.desc.params[op * 9u].names ? vb_op4.desc.params[op * 9u].names[o[0]] : "SIN", sizeof t);
     md_text(84, 36, &MD_F3, 3, t, C_INK);
     str_cpy(t, "X", sizeof t);
     if (o[8]) {

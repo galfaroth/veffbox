@@ -8,7 +8,7 @@ as notes, a sequence or a strummed chord sequence, modulate anything with 6 LFOs
 Every print keeps its recipe, so each of the 64 bank sounds has a generation tree you can branch
 from or rebuild bit-exactly.
 
-**Status:** firmware 0.2.0 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
+**Status:** firmware 0.2.1 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
 chord sequences, modulation, the FX chain, PRINT, the 64-sound bank with generations in flash, and bit-exact REBUILD.
 Not yet: four tracks sounding at once, PITCH as a modulation target, prints longer than 1.67 s.
 
@@ -34,7 +34,7 @@ click. Hash links open a screen directly, e.g. `#t4/SRC` (the DRUM kit) or `#t2/
 
 | FM-1 control | veffbox |
 | --- | --- |
-| EDIT | source (SRC) · SEL = RANDOMIZE |
+| EDIT | source (SRC): SELECT picks the engine, the keys pick the DRUM voice · SEL = RANDOMIZE |
 | ARP / SEQ | play mode and strum / step row |
 | LFO / ENV | modulation · SEL = LEARN a destination |
 | FX | FX chain · SEL = SCRAMBLE |
@@ -52,7 +52,10 @@ Portable, integer-only C in `core/`, tested on the host:
 make test
 ```
 
-This renders every DRUM voice to `host/out/*.wav` and checks repeatability, overflow (fuzzed),
+`make shots` draws every FM-1 screen to `host/shots/*.png` with the firmware's own UI code (needs the MNM-1 tree
+at `MNM=..`). What is left: [docs/ROADMAP.md](docs/ROADMAP.md).
+
+`make test` renders every DRUM voice to `host/out/*.wav` and checks repeatability, overflow (fuzzed),
 the kick's pitch sweep, voice release, LFO routing and tempo sync.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, budgets and milestones.

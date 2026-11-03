@@ -200,7 +200,7 @@ const PAGE_INFO={
  PRINT:{t:'Print',d:'Records the output of the whole chain as a new generation. The print becomes the new source and its recipe goes into the bank.'},
  BANK:{t:'Bank',d:'This sound\'s generation tree. LOAD plays a generation\'s audio. EDIT loads the recipe it was made from, so the next print starts a new branch. RBLD re-renders it from scratch.'},
 };
-const SEL_LBL={SRC:s=>s.src==='OP4'?'OP':s.src==='DRUM'?'VOICE':s.src==='CHOP'?'SLICE':'—',PLAY:()=>'STEP',MOD:()=>'SRC',FX:()=>'SLOT',PRINT:()=>'—',BANK:()=>'GEN',GLO:()=>'—'};
+const SEL_LBL={SRC:()=>'ENGINE',PLAY:()=>'STEP',MOD:()=>'SRC',FX:()=>'SLOT',PRINT:()=>'—',BANK:()=>'GEN',GLO:()=>'—'};
 /* "why" hints for parameters */
 const WHY={
  ALG:'the algorithm decides which operators modulate others and which ones you hear (carriers)',
@@ -359,28 +359,26 @@ function rows(s){
   if(s.src==='OP4'){const o=s.op[s.opSel];return[
    [Ls('WAVE',o,'wave',WAVES),P('CRS',o,'crs',0,32,v=>v?v:'½'),P('FINE',o,'fine',0,99),P('LVL',o,'lvl',0,127)],
    [P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127),P('SUS',o,'sus',0,127),P('REL',o,'rel',0,127)],
-   [P('ALG',s,'alg',0,10,v=>v+1),P('FB',s,'fb',0,127),Ls('FIX',o,'fix',ONOFF),srcP(s)]]}
+   [P('ALG',s,'alg',0,10,v=>v+1),P('FB',s,'fb',0,127),Ls('FIX',o,'fix',ONOFF),{l:'OP',get:()=>s.opSel,set:v=>{s.opSel=v},min:0,max:3,f:v=>OPS[v]}]]}
   if(s.src==='DRUM'){const o=s.drum,v=o.voice,d=DRV[v],pp=i=>({l:d[2][i],get:()=>o.p[v][i],set:x=>{o.p[v][i]=x},min:0,max:127,f:x=>x});
-   return[[Ls('VOICE',o,'voice',DRV.map(x=>x[0])),{l:'LEVEL',get:()=>o.lvl[v],set:x=>{o.lvl[v]=x},min:0,max:127,f:x=>x},pp(0),pp(1)],
-    [pp(2),pp(3),pp(4),pp(5)],[pp(6),pp(7),null,srcP(s)]]}
+   return[[pp(0),pp(1),pp(2),pp(3)],[pp(4),pp(5),pp(6),pp(7)],
+    [{l:'LEVEL',get:()=>o.lvl[v],set:x=>{o.lvl[v]=x},min:0,max:127,f:x=>x},Ls('VOICE',o,'voice',DRV.map(x=>x[0])),null,null]]}
   if(s.src==='ANLG'){const o=s.anlg;return[
    [Ls('OSC1',o,'o1',OSCW),Ls('OSC2',o,'o2',OSCW),P('DET',o,'det',0,100,v=>v+'c'),P('MIX',o,'mix',0,127)],
    [P('SUB',o,'sub',0,127),P('NOIS',o,'nois',0,127),Ls('SYNC',o,'sync',ONOFF),P('PW',o,'pw',0,127)],
    [P('CUT',o,'cut',0,127),P('RES',o,'res',0,127),P('ENV',o,'env',0,127,v=>sgn(v-64)),P('DRV',o,'drv',0,127)],
-   [P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127),P('SUS',o,'sus',0,127),P('REL',o,'rel',0,127)],
-   [srcP(s),null,null,null]]}
+   [P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127),P('SUS',o,'sus',0,127),P('REL',o,'rel',0,127)]]}
   if(s.src==='SAMP'){const o=s.samp;return[
    [P('START',o,'start',0,126),P('LEN',o,'len',1,127),Ls('LOOP',o,'loop',['OFF','FWD','P-P']),Ls('REV',o,'rev',ONOFF)],
-   [P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),P('FINE',o,'fine',0,99),P('FADE',o,'fade',0,127),P('GAIN',o,'gain',0,127)],
-   [srcP(s),null,null,null]]}
+   [P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),P('FINE',o,'fine',0,99),P('FADE',o,'fade',0,127),P('GAIN',o,'gain',0,127)]]}
   if(s.src==='GRAN'){const o=s.gran;return[
    [P('POS',o,'pos',0,127),P('SIZE',o,'size',0,127),P('DENS',o,'dens',0,127),P('SPRAY',o,'spray',0,127)],
    [P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),P('PRND',o,'prnd',0,127),P('REV',o,'rev',0,127,v=>Math.round(v/127*100)+'%'),Ls('WIN',o,'win',['HANN','TRI','RECT','EXP'])],
-   [Ls('FRZ',o,'frz',ONOFF),P('WIDTH',o,'width',0,127),P('SEED',o,'seed',0,999),srcP(s)]]}
+   [Ls('FRZ',o,'frz',ONOFF),P('WIDTH',o,'width',0,127),P('SEED',o,'seed',0,999),null]]}
   const o=s.chop,n=slices(s).length;return[
    [P('SENS',o,'sens',0,127),P('SLICE',o,'slice',0,Math.max(0,n-1),v=>v+1),P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),Ls('REV',o,'rev',ONOFF)],
    [Ls('ORDER',o,'order',['SEQ','SHUF','STUT','REV']),P('LEN',o,'len',1,127),P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127)],
-   [Ls('MAP',o,'map',['KEYS','STEPS']),null,null,srcP(s)]]}
+   [Ls('MAP',o,'map',['KEYS','STEPS']),null,null,null]]}
  case 'PLAY':{
   const r0=[Ls('MODE',p,'mode',PMODES),Ls('STRUM',p,'strum',STRUMS),P('TIME',p,'time',0,127,v=>Math.round(v/127*250)+'ms'),P('HUMAN',p,'hum',0,127)];
   const steps=P('STEPS',p,'len',1,p.mode===1?16:8);
@@ -477,15 +475,13 @@ function knobTap(i){const s=snd(),p=(rows(s)[curRow(s)]||[])[i];if(!p)return;if(
 function sel(d){
  const s=snd(),p=s.play;let what='';
  switch(S.page){
-  case 'SRC':if(s.src==='OP4'){s.opSel=clamp(s.opSel+d,0,3);what='OPERATOR '+OPS[s.opSel]}
-   else if(s.src==='DRUM'){s.drum.voice=clamp(s.drum.voice+d,0,7);what='VOICE '+DRV[s.drum.voice][0]}
-   else if(s.src==='CHOP'){s.chop.slice=clamp(s.chop.slice+d,0,Math.max(0,slices(s).length-1));what='SLICE '+(s.chop.slice+1)}break;
+  case 'SRC':{const i=clamp(SRCS.indexOf(s.src)+d,0,SRCS.length-1);if(SRCS[i]!==s.src){s.src=SRCS[i];S.row.SRC=0;what='ENGINE '+s.src}break}
   case 'PLAY':p.sel=clamp(p.sel+d,0,(p.mode===1?16:8)-1);what='STEP '+(p.sel+1);break;
   case 'MOD':s.modSel=clamp(s.modSel+d,0,8);what=modName(s.modSel);break;
   case 'FX':s.fxSel=clamp(s.fxSel+d,0,7);what='SLOT '+(s.fxSel+1)+' '+FX[s.fx[s.fxSel].type][0];break;
   case 'BANK':s.genSel=clamp(s.genSel+d,0,tree(s).length-1);what='G'+tree(s)[s.genSel].g.id;break;
  }
- if(what)log('SELECT → '+what,'SELECT picks which item on the page the knobs edit.','sel'+S.page);
+ if(what)log('SELECT → '+what,S.page==='SRC'?'On SRC, SELECT picks the engine. In DRUM the keys pick the voice the knobs shape; in OP4 the OP knob (row 3) picks the operator.':'SELECT picks which item on the page the knobs edit.','sel'+S.page);
  render();
 }
 function selPress(){
