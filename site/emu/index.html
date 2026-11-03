@@ -18,7 +18,9 @@ body{padding:16px;display:flex;flex-direction:column;align-items:center;gap:14px
 
 /* the step-by-step card */
 #tour{width:100%;max-width:1000px;background:var(--ink);color:var(--soft);border-radius:22px;padding:14px 18px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 16px;align-items:center}
-#tour[hidden]{display:none}
+#tour[hidden],#tourStart[hidden]{display:none}
+#tourStart{border:0;border-radius:999px;padding:12px 22px;font:700 16px/1 'Space Grotesk',sans-serif;background:var(--ink);color:var(--soft);cursor:pointer;box-shadow:0 3px 0 #000}
+#tourStart:hover{background:var(--accent-ink)}
 #tour .n{font:700 13px/1 var(--mono);color:var(--accent);white-space:nowrap}
 #tour h2{font-size:21px;line-height:1.15;letter-spacing:-.01em}
 #tour h2 kbd{font:700 15px/1 var(--mono);background:var(--accent);color:var(--ink);border-radius:6px;padding:2px 7px;vertical-align:2px}
@@ -66,7 +68,8 @@ body{padding:16px;display:flex;flex-direction:column;align-items:center;gap:14px
 .key .kn{opacity:.7}
 
 /* what to press next */
-.hl{z-index:4;animation:hl 1.1s ease-in-out infinite}
+.hl{animation:hl 1.1s ease-in-out infinite}
+.b.hl,.hl.knob,.hl.start{z-index:4}
 .hl.b,.tray.hl{outline:4px solid var(--ink);outline-offset:4px}
 .hl.knob .kb{outline:4px solid var(--ink);outline-offset:5px;animation:hl 1.1s ease-in-out infinite}
 .hl.start{outline:4px solid var(--ink);outline-offset:-4px}
@@ -81,10 +84,11 @@ body{padding:16px;display:flex;flex-direction:column;align-items:center;gap:14px
 </style>
 </head>
 <body>
+<button type="button" id="tourStart">Start tutorial: make your own sound →</button>
 <section id="tour" hidden aria-live="polite">
   <span class="n" id="tn"></span>
   <h2 id="tt"></h2>
-  <div class="nav"><button type="button" id="tback">Back</button><button type="button" id="tskip">Skip</button></div>
+  <div class="nav"><button type="button" id="tback">Back</button><button type="button" id="tskip">Skip</button><button type="button" id="tend">Finish tutorial now</button></div>
   <p id="tw"></p>
   <div class="bar"><i id="tbar"></i></div>
 </section>
@@ -275,6 +279,7 @@ function showStep() {
   document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
   tag.hidden = true;
   $('tour').hidden = !tourOn;
+  $('tourStart').hidden = tourOn;
   if (!tourOn) return;
   if (step === 0 && M) step = 1;
   const s = STEPS[step], last = step === STEPS.length - 1;
@@ -283,6 +288,7 @@ function showStep() {
   T.bar.style.width = (100 * step / (STEPS.length - 1)) + '%';
   T.back.hidden = step <= 1;
   T.skip.textContent = last ? 'Start over' : 'Skip'; T.skip.className = last ? 'go' : '';
+  $('tend').textContent = last ? 'Close' : 'Finish tutorial now';
   const at = sub ? s.also : s.at, el = targetEl(at);
   if (!el) return;
   el.classList.add('hl');
@@ -306,6 +312,8 @@ T.skip.addEventListener('click', () => { sub = false; if (step === STEPS.length 
 T.back.addEventListener('click', () => { sub = false; if (step > 1) step--; showStep(); });
 function setTour() { tourOn = location.hash.includes('tour'); showStep(); }
 addEventListener('hashchange', setTour);
+$('tourStart').addEventListener('click', () => { tourOn = true; sub = false; step = M ? 1 : 0; showStep(); });
+$('tend').addEventListener('click', () => { tourOn = false; sub = false; showStep(); });
 
 /* ---- the bank in this browser */
 const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };

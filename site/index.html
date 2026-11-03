@@ -370,8 +370,8 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
       source, a strummed chord sequence, modulation and up to eight effects. Then <b>RESAMPLE</b>: the recording becomes the
       new source, and the recipe that made it is kept, so every sound can be <b>rebuilt bit for bit</b>.</p>
     <div class="ctas">
-      <a class="btn" href="#try">Play it in the browser <span aria-hidden="true">↓</span></a>
-      <a class="btn ghost" href="#guide">Your first sound</a>
+      <a class="btn" href="#try">Try it in the browser <span aria-hidden="true">↓</span></a>
+      <a class="btn ghost" href="#try" id="firstSound">Make your first sound</a>
     </div>
     <ul class="facts">
       <li><b>6</b>sources: FM, analog, drums, and three ways to play a resample</li>
@@ -390,12 +390,8 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <h3 id="try-title">Play it right here.</h3>
       </div>
       <p>The <b>emulator</b> runs the Veffbox firmware itself in your browser: the same screen, the same engines, the same
-        sound, and your bank is kept in this browser. <b>Step by step</b> lights up what to press next and says why, from
+        sound, and your bank is kept in this browser. <b>Start tutorial</b> lights up what to press next and says why, from
         the first sound to a resample, the tree and a chord sequence.</p>
-    </div>
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" aria-selected="true" data-src="emu/index.html#play">Emulator</button>
-      <button type="button" role="tab" aria-selected="false" data-src="emu/index.html#tour">Step by step · make your own sound</button>
     </div>
     <div class="frame">
       <iframe id="demo" class="emu" src="emu/index.html" title="Veffbox emulator: the firmware in the browser" loading="eager" allow="autoplay"></iframe>
@@ -407,10 +403,8 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
   </div>
 </section>
 <script>
-(() => { const f = document.getElementById('demo'), full = document.getElementById('full');
-  document.querySelectorAll('.tabs [role=tab]').forEach(b => b.addEventListener('click', () => {
-    document.querySelectorAll('.tabs [role=tab]').forEach(x => x.setAttribute('aria-selected', x === b));
-    f.src = b.dataset.src; full.href = b.dataset.src; })); })();
+/* "Make your first sound": the emulator with the tutorial running */
+document.getElementById('firstSound').addEventListener('click', () => { document.getElementById('demo').src = 'emu/index.html#tour'; });
 </script>
 
 <!-- GUIDE -->
