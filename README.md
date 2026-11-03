@@ -8,8 +8,8 @@ as notes, a sequence or a strummed chord sequence, modulate anything with 6 LFOs
 Every resample keeps its recipe, so each of the 64 bank sounds has a generation tree you can branch
 from or rebuild bit-exactly.
 
-**Status:** firmware 0.2.2 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
-chord sequences, modulation, the FX chain, RESAMPLE, the 64-sound bank with generations in flash, and bit-exact REBUILD.
+**Status:** firmware 0.3.0 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
+chord sequences (16 chords of up to 8 notes, a BASS tone, voicings), songs, modulation, the FX chain, RESAMPLE, the 64-sound bank with generations in flash, and bit-exact REBUILD.
 Not yet: four tracks sounding at once, PITCH as a modulation target, resamples longer than 1.67 s.
 
 ## Build, install, test on the hardware

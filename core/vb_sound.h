@@ -19,8 +19,9 @@ extern const char *const vb_src_name[VB_SRCS];
 #define VB_GRAN_NP 11                     /* POS SIZE DENS SPRAY PITCH PRND REV WIN FRZ WIDTH SEED */
 #define VB_CHOP_NP 9                      /* SENS SLICE PITCH REV ORDER LEN ATK DEC MAP */
 #define VB_SAMP_NP 8                      /* START LEN LOOP REV PITCH FINE FADE GAIN */
-#define VB_CHORD_STEPS 8
-#define VB_CHORD_NOTES 6
+#define VB_CHORD_STEPS 16
+#define VB_CHORD_TYPES 22
+#define VB_CHORD_NOTES 8
 #define VB_SEQ_STEPS 16
 #define VB_MODSRC 9                       /* L1..L6, E1..E3 */
 #define VB_PRINT_NP 6                     /* LEN START NORM AFTER TAIL FMT */
@@ -31,7 +32,11 @@ extern const char *const vb_strum_name[VB_STRUMS];
 extern const uint8_t vb_len16[12];        /* chord step lengths in sixteenths */
 extern const char *const vb_len_name[12];
 
-typedef struct { uint8_t note[VB_CHORD_NOTES]; uint8_t n, root, type, len_i, gate; } vb_chord_t;
+/* a chord step: up to 8 exact notes, its BASS (0 = none, n = the chord's n-th tone from the root, an octave or two
+ * down, played first by every strum: C with E in the bass = 2) and its VOICING */
+typedef struct { uint8_t note[VB_CHORD_NOTES]; uint8_t n, root, type, len_i, gate, bass, voi; } vb_chord_t;
+enum { VB_VOI_CLOSE, VB_VOI_OPEN, VB_VOI_DROP2, VB_VOI_SPREAD, VB_VOI_VEFF, VB_VOICINGS };
+extern const char *const vb_voicing_name[VB_VOICINGS];
 typedef struct { uint8_t on, note, slide, prob; } vb_step_t;
 typedef struct {
     uint8_t mode, strum, time, hum, vel, sprd, rate, len, sel;
@@ -93,6 +98,12 @@ int vb_addr_list(const vb_recipe_t *r, vb_addr_t *out, int max);
 /* chord helpers */
 void vb_chord_fill(vb_chord_t *c, int root, int type, int base_note);
 int vb_chord_name(const vb_chord_t *c, char *out, int max);
-extern const char *const vb_chord_type_name[11];
+/* rewrites the step's notes from its pitch classes in voicing v (VB_VOI_*); the notes stay editable after */
+void vb_chord_voice(vb_chord_t *c, int v);
+extern const char *const vb_chord_type_name[VB_CHORD_TYPES];
+/* the chord's tones as pitch classes in chord order (root, 3rd, 5th, 6th / 7th, 9th, 11th); returns the count */
+int vb_chord_tones(const vb_chord_t *c, uint8_t *pcs);
+/* the BASS note to play (0 = none) */
+int vb_chord_bass(const vb_chord_t *c);
 
 #endif

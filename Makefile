@@ -7,7 +7,7 @@ CORE = $(wildcard core/*.c)
 TESTS = $(patsubst %.c,%,$(wildcard host/test_*.c))
 
 
-.PHONY: test tables clean shots emu
+.PHONY: test tables clean shots emu uitest
 MNM ?= ..
 test: $(TESTS)
 	@mkdir -p host/out
@@ -22,6 +22,11 @@ shots: host/shot.c fw/vb_app.c $(CORE)
 	@mkdir -p host/shots
 	./host/shot
 
+# the firmware's UI on the host, flash in RAM: steps, OCT, VOICING / BASS, songs, saving, a restart
+uitest: host/ui_test.c host/vb_host.h fw/vb_app.c $(CORE)
+	$(CC) -std=c11 -O1 -w -I$(MNM)/firmware/src -I$(MNM)/build/gen -o host/ui_test host/ui_test.c $(CORE)
+	./host/ui_test
+
 # the web emulator: the firmware as WebAssembly for site/emu/ (emscripten's emcc on the PATH)
 EMU_FN = _emu_fb,_emu_flash,_emu_flash_size,_emu_flash_writes,_emu_audio_buf,_emu_init,_emu_frame,_emu_button,_emu_led,_emu_encoder,_emu_key,_emu_master,_emu_audio,_emu_playing
 emu: host/emu.c host/vb_host.h fw/vb_app.c $(CORE)
@@ -33,4 +38,4 @@ tables:
 	python3 tools/gen_tables.py > core/vb_tables.h
 
 clean:
-	rm -rf $(TESTS) host/out host/shot host/shots
+	rm -rf $(TESTS) host/out host/shot host/shots host/ui_test

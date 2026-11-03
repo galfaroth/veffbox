@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include "vb_sound.h"
 
-#define VB_EVQ 48
+#define VB_EVQ 64
 #define VB_CMDQ 32
 
 typedef struct { uint32_t t; uint8_t note, vel, on; } vb_ev_t;

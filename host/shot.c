@@ -123,6 +123,15 @@ int main(void)
         RC->play.mode = (uint8_t)s;
         rows(M[s], B_ARP);
     }
+    RC->play.mode = VB_PLAY_CHORD;                          /* a VEFF voicing with a BASS, on the VOICING row */
+    RC->play.sel = 4;
+    vb_chord_voice(&RC->play.chord[4], VB_VOI_VEFF);
+    RC->play.chord[4].bass = 36;
+    ui.row[PG_PLAY] = 2;
+    shot("play_chord_veff");
+    ui.row[PG_PLAY] = 3;
+    shot("play_chord_veff_notes");
+    ui.row[PG_PLAY] = 0;
     btn(B_LFO);
     rows("mod_lfo", B_LFO);
     btn(B_ENV);

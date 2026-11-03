@@ -199,7 +199,7 @@ static void ev_run(vb_player_t *p, uint32_t until)
 
 static void sched_chord(vb_player_t *p, const vb_chord_t *c, uint32_t steplen)
 {
-    uint8_t ns[12], ord[12];
+    uint8_t ns[16], ord[16];
     int n = c->n, i, j, k, strum = p->rc->play.strum;
     uint32_t gap, jit, off_t;
     if (!n)
@@ -213,9 +213,9 @@ static void sched_chord(vb_player_t *p, const vb_chord_t *c, uint32_t steplen)
             ns[j - 1] = t;
         }
     if (strum == VB_STRUM_HARP) {            /* the chord and its octave, wide */
-        for (i = 0; i < n && n + i < 12; i++)
+        for (i = 0; i < n && n + i < 16; i++)
             ns[n + i] = (uint8_t)(ns[i] + 12 > 127 ? 127 : ns[i] + 12);
-        n = n * 2 > 12 ? 12 : n * 2;
+        n = n * 2 > 16 ? 16 : n * 2;
     }
     for (i = 0; i < n; i++)
         ord[i] = (uint8_t)i;
@@ -236,10 +236,16 @@ static void sched_chord(vb_player_t *p, const vb_chord_t *c, uint32_t steplen)
     gap = (uint32_t)eplay[0] * 250u * 441u / 1270u;          /* TIME: 0 .. 250 ms */
     if (strum == VB_STRUM_LUSH)
         gap = 0;
-    if (strum == VB_STRUM_ARP)
+    if (strum == VB_STRUM_ARP && n)
         gap = steplen / (uint32_t)n;
     jit = (uint32_t)eplay[1] * 882u / 127u;                   /* HUMAN: up to 20 ms */
     off_t = p->now + steplen * c->gate / 100u;
+    if (vb_chord_bass(c)) {                  /* the BASS: first, on the beat, for the whole gate */
+        ev_add(p, p->now, vb_chord_bass(c), eplay[2], 1);
+        ev_add(p, off_t, vb_chord_bass(c), 0, 0);
+    }
+    if (!n)
+        return;
     for (k = 0; k < n; k++) {
         uint32_t dt = (uint32_t)k * gap + (jit ? vb_rng(&p->rng) % (jit + 1u) : 0u);
         int vel = eplay[2];

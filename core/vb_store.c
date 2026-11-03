@@ -4,6 +4,117 @@
 #define MAGIC 0x31534256u                       /* "VBS1" */
 /* header: magic u32, payload bytes u16, crc16 u16, recipe size u16, ngen u8, curgen u8 */
 #define HDR 12u
+#if defined(FELUCCA_VERSION) && !defined(__EMSCRIPTEN__)       /* the FM-1 build: big buffers in the pool, not .bss */
+#define VB_POOL __attribute__((section(".pool")))
+#else
+#define VB_POOL
+#endif
+
+typedef char vb_formats_differ[sizeof(vb_recipe_t) != 640u && sizeof(vb_recipe_t) != 672u ? 1 : -1];
+
+/* older formats, read and converted on unpack. Format 1 (to 0.2.2): 8 chord steps of 6 notes. Format 2 (0.3.0
+ * test builds): 8 steps of 8 notes, the BASS a MIDI note. Format 3: 16 steps, the BASS a chord tone. */
+typedef struct { uint8_t note[6]; uint8_t n, root, type, len_i, gate; } chord_v1_t;
+typedef struct { uint8_t note[8]; uint8_t n, root, type, len_i, gate, bass, voi; } chord_v2_t;
+#define OLD_RECIPE(name, chord_t)                                                                    \
+    typedef struct {                                                                                 \
+        uint8_t mode, strum, time, hum, vel, sprd, rate, len, sel;                                   \
+        chord_t chord[8];                                                                            \
+        vb_step_t seq[VB_SEQ_STEPS];                                                                 \
+    } name##_play_t;                                                                                 \
+    typedef struct {                                                                                 \
+        uint8_t src;                                                                                 \
+        uint8_t op4[VB_OP4_NP];                                                                      \
+        uint8_t anlg[VB_ANLG_NP];                                                                    \
+        vb_drum_patch_t drum;                                                                        \
+        uint8_t samp[VB_SAMP_NP];                                                                    \
+        uint8_t gran[VB_GRAN_NP];                                                                    \
+        uint8_t chop[VB_CHOP_NP];                                                                    \
+        name##_play_t play;                                                                          \
+        vb_modsrc_t mod[VB_MODSRC];                                                                  \
+        vb_fx_slot_t fx[VB_FX_SLOTS];                                                                \
+        uint8_t print[VB_PRINT_NP];                                                                  \
+        uint8_t pnote;                                                                               \
+        uint16_t bpm10;                                                                              \
+        uint32_t seed;                                                                               \
+    } name##_t;
+OLD_RECIPE(recipe_v1, chord_v1_t)
+OLD_RECIPE(recipe_v2, chord_v2_t)
+
+/* everything but the chords, from an older recipe o into r */
+#define COPY_REST(r, o)                                                                              \
+    do {                                                                                             \
+        uint32_t i_;                                                                                 \
+        (r)->src = (o)->src;                                                                         \
+        for (i_ = 0; i_ < VB_OP4_NP; i_++) (r)->op4[i_] = (o)->op4[i_];                              \
+        for (i_ = 0; i_ < VB_ANLG_NP; i_++) (r)->anlg[i_] = (o)->anlg[i_];                           \
+        (r)->drum = (o)->drum;                                                                       \
+        for (i_ = 0; i_ < VB_SAMP_NP; i_++) (r)->samp[i_] = (o)->samp[i_];                           \
+        for (i_ = 0; i_ < VB_GRAN_NP; i_++) (r)->gran[i_] = (o)->gran[i_];                           \
+        for (i_ = 0; i_ < VB_CHOP_NP; i_++) (r)->chop[i_] = (o)->chop[i_];                           \
+        (r)->play.mode = (o)->play.mode; (r)->play.strum = (o)->play.strum;                          \
+        (r)->play.time = (o)->play.time; (r)->play.hum = (o)->play.hum; (r)->play.vel = (o)->play.vel; \
+        (r)->play.sprd = (o)->play.sprd; (r)->play.rate = (o)->play.rate;                            \
+        (r)->play.len = (o)->play.len; (r)->play.sel = (o)->play.sel;                                \
+        for (i_ = 0; i_ < VB_SEQ_STEPS; i_++) (r)->play.seq[i_] = (o)->play.seq[i_];                 \
+        for (i_ = 0; i_ < VB_MODSRC; i_++) (r)->mod[i_] = (o)->mod[i_];                              \
+        for (i_ = 0; i_ < VB_FX_SLOTS; i_++) (r)->fx[i_] = (o)->fx[i_];                              \
+        for (i_ = 0; i_ < VB_PRINT_NP; i_++) (r)->print[i_] = (o)->print[i_];                        \
+        (r)->pnote = (o)->pnote; (r)->bpm10 = (o)->bpm10; (r)->seed = (o)->seed;                     \
+    } while (0)
+
+static void chords_clear(vb_recipe_t *r)
+{
+    uint32_t i, k;
+    for (i = 0; i < VB_CHORD_STEPS; i++) {
+        vb_chord_t *c = &r->play.chord[i];
+        for (k = 0; k < VB_CHORD_NOTES; k++)
+            c->note[k] = 0;
+        c->n = c->root = c->type = c->bass = c->voi = 0;
+        c->len_i = 7;
+        c->gate = 90;
+    }
+}
+
+/* r holds an older recipe (version 1 or 2) in its first bytes: rewritten in place as the current format */
+static void convert(vb_recipe_t *r, uint32_t version)
+{
+    static union { recipe_v1_t a; recipe_v2_t b; } o VB_POOL;   /* (static: the main loop's stack is small) */
+    uint32_t i, k, n = version == 1u ? sizeof o.a : sizeof o.b;
+    const uint8_t *src = (const uint8_t *)r;
+    uint8_t *dst = (uint8_t *)&o;
+    for (i = 0; i < n; i++)
+        dst[i] = src[i];
+    if (version == 1u)
+        COPY_REST(r, &o.a);
+    else
+        COPY_REST(r, &o.b);
+    chords_clear(r);
+    for (i = 0; i < 8u; i++) {
+        vb_chord_t *c = &r->play.chord[i];
+        if (version == 1u) {
+            const chord_v1_t *q = &o.a.play.chord[i];
+            for (k = 0; k < 6u; k++)
+                c->note[k] = q->note[k];
+            c->n = q->n > 6 ? 6 : q->n;
+            c->root = q->root; c->type = q->type; c->len_i = q->len_i; c->gate = q->gate;
+        } else {
+            const chord_v2_t *q = &o.b.play.chord[i];
+            for (k = 0; k < 8u; k++)
+                c->note[k] = q->note[k];
+            c->n = q->n > 8 ? 8 : q->n;
+            c->root = q->root; c->type = q->type; c->len_i = q->len_i; c->gate = q->gate; c->voi = q->voi;
+            if (q->bass) {                                 /* the old BASS note: the chord tone of its class, else the root */
+                uint8_t pcs[12];
+                int t = vb_chord_tones(c, pcs), j;
+                c->bass = 1;
+                for (j = 0; j < t; j++)
+                    if (pcs[j] == q->bass % 12)
+                        c->bass = (uint8_t)(j + 1);
+            }
+        }
+    }
+}
 
 uint16_t vb_crc16(const uint8_t *p, uint32_t n)
 {
@@ -89,12 +200,18 @@ int vb_sound_pack(const vb_recipe_t *cur, const vb_gen_t *gens, int ngen, int cu
 
 int vb_sound_unpack(const uint8_t *sector, vb_recipe_t *cur, vb_gen_t *gens, int maxgen, int *curgen)
 {
-    const uint32_t rs = sizeof(vb_recipe_t);
-    uint32_t len, o, g, n;
+    uint32_t rs = sizeof(vb_recipe_t), len, o, g, n, old = 0;
     uint8_t *c = (uint8_t *)cur;
     if (((uint32_t)sector[0] | (uint32_t)sector[1] << 8 | (uint32_t)sector[2] << 16 | (uint32_t)sector[3] << 24) != MAGIC)
         return -1;
     len = r16(sector + 4);
+    if (r16(sector + 8) == sizeof(recipe_v1_t)) {     /* an older sound: unpacked as it was, then converted */
+        rs = sizeof(recipe_v1_t);
+        old = 1;
+    } else if (r16(sector + 8) == sizeof(recipe_v2_t)) {
+        rs = sizeof(recipe_v2_t);
+        old = 2;
+    }
     if (len > VB_SECTOR - HDR || len < rs || r16(sector + 8) != rs || vb_crc16(sector + HDR, len) != r16(sector + 6))
         return -1;
     for (g = 0; g < rs; g++)
@@ -121,6 +238,11 @@ int vb_sound_unpack(const uint8_t *sector, vb_recipe_t *cur, vb_gen_t *gens, int
             e += k;
         }
         o += d;
+    }
+    if (old) {                                          /* the generations' deltas were against the old bytes */
+        for (g = 0; g < n; g++)
+            convert(&gens[g].rc, old);
+        convert(cur, old);
     }
     *curgen = sector[11] < n ? sector[11] : (n ? (int)n - 1 : 0);
     return (int)n;

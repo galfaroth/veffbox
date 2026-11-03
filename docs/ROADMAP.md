@@ -5,10 +5,6 @@ and screenshots of the new screens (`make shots`).
 
 ## Next
 
-1. **Chords on the device.** Up to 8 notes per step, a BASS note per step (played first by every strum), and VOICING:
-   CLOSE, OPEN, DROP2, SPREAD and VEFF. VEFF puts the root and fifth low, then the 3rd, 7th and 9th (plus the 11th in
-   minor) packed in seconds up high. The recipe grows, so the flash format needs a version and a migration that keeps
-   the stored bank. The mockup already does all of this.
 2. **Four tracks sounding at once.** The background tracks get only FX that need no buffer, because RAM is nearly full:
    95.7 of 96 KiB, and the pool has 14 KiB free.
 3. **Sidechain on the device**, as in the mockup:
@@ -36,6 +32,14 @@ and screenshots of the new screens (`make shots`).
 
 ## Done
 
+- 0.3.0: chords: 16 steps of up to 8 notes, 22 types (6, m6, 6/9, maj9, 9, m11, 7sus4, maj7#11, m7b5, aug, madd9
+  added), the BASS as a chord tone (1 root, 2 third, 3 fifth ...) in octave 2, VOICING (CLOSE OPEN DROP2 SPREAD VEFF),
+  extended names. EDIT on PLAY (SEL runs it): INS, DUP, DEL, ON/OFF in SEQ. OCT on PLAY moves the selected chord or
+  step by 12. SONG (SAVE pressed again): 64 songs, each the 4 tracks' sounds, BPM and CHAOS (the parts live in the
+  sounds); COPY (BANK) puts a sound in a free slot so two songs can play different parts of it. SEL on the LFO / ENV
+  shape rows = RANDOM, on the destination rows = LEARN. Every changed sound is saved. Older banks (formats 1 and 2)
+  convert on load. 10 voices: 48% CPU with ten OP4 notes held. `make uitest`. Two flash sectors (0xDE000..0xE0000)
+  are free now.
 - The site: the emulator (the firmware as WebAssembly, `make emu`: real screen, real sound, the bank kept in the
   browser), the web installer (MNM-1's, `tools/make_site.py`), `fmhub.json`, and a Pages workflow.
   The repo is public and the site is at https://galfaroth.github.io/veffbox/. Left Veffbox to MNM-1 1.0.1 and came

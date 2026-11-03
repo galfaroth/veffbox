@@ -11,11 +11,19 @@ const char *const vb_strum_name[VB_STRUMS] = {"UP", "DOWN", "ALT", "RND", "HARP"
 const uint8_t vb_len16[12] = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64};
 const char *const vb_len_name[12] = {"1/16", "1/8", "3/16", "1/4", "3/8", "1/2", "3/4", "1 BAR", "1.5BR", "2 BAR",
                                      "3 BAR", "4 BAR"};
-const char *const vb_chord_type_name[11] = {"MAJ", "MIN", "7", "MAJ7", "MIN7", "SUS2", "SUS4", "ADD9", "MIN9", "DIM", "5"};
-static const char *const CHORD_SUFFIX[11] = {"", "m", "7", "maj7", "m7", "sus2", "sus4", "add9", "m9", "dim", "5"};
-static const int8_t CHORD_IV[11][6] = {
+const char *const vb_voicing_name[VB_VOICINGS] = {"CLOSE", "OPEN", "DROP2", "SPREAD", "VEFF"};
+const char *const vb_chord_type_name[VB_CHORD_TYPES] = {
+    "MAJ", "MIN", "7", "MAJ7", "MIN7", "SUS2", "SUS4", "ADD9", "MIN9", "DIM", "5",
+    "6", "MIN6", "6/9", "MAJ9", "9", "MIN11", "7SUS4", "MAJ7#11", "M7B5", "AUG", "MADD9"};
+static const char *const CHORD_SUFFIX[VB_CHORD_TYPES] = {
+    "", "m", "7", "maj7", "m7", "sus2", "sus4", "add9", "m9", "dim", "5",
+    "6", "m6", "6/9", "maj9", "9", "m11", "7sus4", "maj7#11", "m7b5", "aug", "madd9"};
+static const int8_t CHORD_IV[VB_CHORD_TYPES][7] = {
     {0, 4, 7, -1}, {0, 3, 7, -1}, {0, 4, 7, 10, -1}, {0, 4, 7, 11, -1}, {0, 3, 7, 10, -1}, {0, 2, 7, -1},
     {0, 5, 7, -1}, {0, 4, 7, 14, -1}, {0, 3, 7, 10, 14, -1}, {0, 3, 6, -1}, {0, 7, 12, -1},
+    {0, 4, 7, 9, -1}, {0, 3, 7, 9, -1}, {0, 4, 7, 9, 14, -1}, {0, 4, 7, 11, 14, -1}, {0, 4, 7, 10, 14, -1},
+    {0, 3, 7, 10, 14, 17, -1}, {0, 5, 7, 10, -1}, {0, 4, 7, 11, 18, -1}, {0, 3, 6, 10, -1}, {0, 4, 8, -1},
+    {0, 3, 7, 14, -1},
 };
 static const char *const NOTE_NAME[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 static const char *const OPN[4] = {"A", "B", "C", "D"};
@@ -59,8 +67,104 @@ void vb_chord_fill(vb_chord_t *c, int root, int type, int base_note)
     c->root = (uint8_t)root;
     c->type = (uint8_t)type;
     c->n = 0;
-    for (i = 0; i < VB_CHORD_NOTES && CHORD_IV[type][i] >= 0; i++)
+    for (i = 0; i < 7 && CHORD_IV[type][i] >= 0; i++)
         c->note[c->n++] = (uint8_t)(base_note + root + CHORD_IV[type][i]);
+    if (c->voi)
+        vb_chord_voice(c, c->voi);
+}
+
+static void sort_u8(uint8_t *a, int n)
+{
+    int i, j;
+    for (i = 1; i < n; i++)
+        for (j = i; j > 0 && a[j - 1] > a[j]; j--) {
+            uint8_t t = a[j];
+            a[j] = a[j - 1];
+            a[j - 1] = t;
+        }
+}
+
+int vb_chord_tones(const vb_chord_t *c, uint8_t *pcs)
+{
+    uint32_t have = 0;
+    int i, n = 0;
+    for (i = 0; i < c->n; i++)
+        have |= 1u << (((c->note[i] - c->root) % 12 + 12) % 12);
+    {   /* in chord order: root, third, fifth, sixth / seventh, ninth, eleventh (sus seconds and fourths last) */
+        static const uint8_t ORDER[12] = {0, 4, 3, 7, 6, 8, 9, 10, 11, 2, 1, 5};
+        for (i = 0; i < 12; i++)
+            if ((have >> ORDER[i]) & 1u)
+                pcs[n++] = (uint8_t)((c->root + ORDER[i]) % 12);
+    }
+    return n;
+}
+
+int vb_chord_bass(const vb_chord_t *c)
+{
+    uint8_t pcs[12];
+    int n = vb_chord_tones(c, pcs);
+    if (!c->bass || !n)
+        return 0;
+    return 36 + pcs[(c->bass - 1) % n];                 /* C2 .. B2 */
+}
+
+/* the voicings, as in the mockup (ui/index.html revoice): a = the root in the octave of C3 */
+void vb_chord_voice(vb_chord_t *c, int v)
+{
+    int pcs[12], np = 0, out[16], no = 0, a, i, k, last;
+    uint32_t have = 0;
+    if (!c->n || v < 0 || v >= VB_VOICINGS)
+        return;
+    for (i = 0; i < c->n; i++)
+        have |= 1u << (((c->note[i] - c->root) % 12 + 12) % 12);
+    for (i = 0; i < 12; i++)
+        if ((have >> i) & 1u)
+            pcs[np++] = i;
+    a = 48 + c->root;
+    if (v == VB_VOI_CLOSE || v == VB_VOI_DROP2) {
+        for (i = 0; i < np; i++)
+            out[no++] = a + pcs[i];
+        if (v == VB_VOI_DROP2 && no > 2)
+            out[no - 2] -= 12;
+    } else if (v == VB_VOI_OPEN) {
+        for (i = 0; i < np; i++)
+            out[no++] = a + pcs[i] + (i & 1 ? 12 : 0);
+    } else if (v == VB_VOI_SPREAD) {
+        out[no++] = last = a - 12;
+        for (i = 0, k = 0; i < np; i++) {
+            int n;
+            if (!pcs[i])
+                continue;
+            for (n = a - 12 + pcs[i]; n < last + (k ? 3 : 7); n += 12)
+                ;
+            out[no++] = last = n;
+            k++;
+        }
+    } else {                                                /* VEFF: root and fifth low, 3 7 9 (11 in minor) packed high */
+        uint32_t up = (have & ~(1u | 1u << 7)) | 1u << 2 | (((have >> 3) & 1u) ? 1u << 5 : 0u);
+        out[no++] = a - 12;
+        out[no++] = a - 5;
+        for (i = 1; i < 12; i++)
+            if ((up >> i) & 1u)
+                out[no++] = a + i + (i < 3 ? 12 : 0);
+        out[no++] = a + 19;
+    }
+    {
+        uint8_t ns[16];
+        int m = 0;
+        for (i = 0; i < no; i++) {
+            int n = out[i] < 24 ? out[i] + 12 : out[i] > 108 ? out[i] - 12 : out[i];
+            for (k = 0; k < m && ns[k] != n; k++)
+                ;
+            if (k == m)
+                ns[m++] = (uint8_t)n;
+        }
+        sort_u8(ns, m);
+        c->n = (uint8_t)(m > VB_CHORD_NOTES ? VB_CHORD_NOTES : m);
+        for (i = 0; i < c->n; i++)
+            c->note[i] = ns[i];
+    }
+    c->voi = (uint8_t)v;
 }
 
 int vb_chord_name(const vb_chord_t *c, char *out, int max)
@@ -77,10 +181,10 @@ int vb_chord_name(const vb_chord_t *c, char *out, int max)
         r = k < 0 ? lo % 12 : k;
         if (!((pcs >> r) & 1u))
             continue;
-        for (i = 0; i < 11; i++) {
+        for (i = 0; i < VB_CHORD_TYPES; i++) {
             uint32_t tp = 0, set = 0;
             int j;
-            for (j = 0; j < 6 && CHORD_IV[i][j] >= 0; j++)
+            for (j = 0; j < 7 && CHORD_IV[i][j] >= 0; j++)
                 tp |= 1u << (CHORD_IV[i][j] % 12);
             for (j = 0; j < 12; j++)
                 if ((pcs >> j) & 1u)
@@ -100,7 +204,39 @@ int vb_chord_name(const vb_chord_t *c, char *out, int max)
         int at = vb_strcpy(out, NOTE_NAME[lo % 12], max);
         return vb_catnum(out, at, lo / 12 - 1, max);
     }
-    return vb_cat(out, vb_strcpy(out, NOTE_NAME[lo % 12], max), "*", max);
+    {   /* extended: root, then m, 7 / maj7, (9, 11), sus */
+        int r0 = c->root % 12, at;
+        uint32_t h = 0;
+        for (i = 0; i < 12; i++)
+            if ((pcs >> i) & 1u)
+                h |= 1u << ((i - r0 + 12) % 12);
+#define H(x) ((h >> (x)) & 1u)
+        at = vb_strcpy(out, NOTE_NAME[r0], max);
+        if (H(3) && !H(4))
+            at = vb_cat(out, at, "m", max);
+        if (H(10))
+            at = vb_cat(out, at, "7", max);
+        else if (H(11))
+            at = vb_cat(out, at, "maj7", max);
+        if (H(10) || H(11)) {
+            if (H(2) && H(5) && (H(3) || H(4)))
+                at = vb_cat(out, at, "(9,11)", max);
+            else if (H(2))
+                at = vb_cat(out, at, "(9)", max);
+            else if (H(5) && (H(3) || H(4)))
+                at = vb_cat(out, at, "(11)", max);
+        } else if (H(2) && (H(3) || H(4))) {
+            at = vb_cat(out, at, "add9", max);
+        }
+        if (!H(3) && !H(4))
+            at = vb_cat(out, at, H(5) ? "sus4" : H(2) ? "sus2" : "", max);
+        if (lo % 12 != r0) {
+            at = vb_cat(out, at, "/", max);
+            at = vb_cat(out, at, NOTE_NAME[lo % 12], max);
+        }
+#undef H
+        return at;
+    }
 }
 
 void vb_recipe_default(vb_recipe_t *r, uint32_t seed)
@@ -131,9 +267,10 @@ void vb_recipe_default(vb_recipe_t *r, uint32_t seed)
     r->play.sprd = 20;
     r->play.rate = 1;
     r->play.len = 8;
-    for (i = 0; i < VB_CHORD_STEPS; i++) {
-        vb_chord_fill(&r->play.chord[i], ROOTS[i][0], ROOTS[i][1], 48);
-        r->play.chord[i].len_i = ROOTS[i][2];
+    for (i = 0; i < VB_CHORD_STEPS; i++) {                 /* 8 chords; the steps after them empty, a bar each */
+        if (i < 8)
+            vb_chord_fill(&r->play.chord[i], ROOTS[i][0], ROOTS[i][1], 48);
+        r->play.chord[i].len_i = i < 8 ? ROOTS[i][2] : 7;
         r->play.chord[i].gate = 90;
     }
     for (i = 0; i < VB_SEQ_STEPS; i++) {

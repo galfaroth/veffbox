@@ -12,6 +12,7 @@
  * Pressing the page's button again steps through its rows; KNOB 1-4 edit the lit row. */
 
 static void vb_midi_in(void);
+static void load_gens(uint32_t sound);
 static void vb_draw_now(void);
 /* ---- panel: which matrix button / encoder carries which label (MNM-1's panel.c defaults) */
 enum { B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO, B_HOME, B_SAVE, B_ARP, B_SEQ, B_PLAY, B_REC, B_OCTDN, B_OCTUP, NB };
@@ -105,7 +106,7 @@ static void vb_all_off(void) { vb_player_panic(&vb_pl); }
 enum { PG_SRC, PG_PLAY, PG_MOD, PG_FX, PG_PRINT, PG_BANK, PG_GLO, NPG };
 static const char *const PG_NAME[NPG] = {"SRC", "PLAY", "MOD", "FX", "RESAMPLE", "BANK", "GLO"};
 static struct {
-    uint8_t page, row[NPG], track, op, opsel, dvoice, oct, chaos, bank_do;
+    uint8_t page, row[NPG], track, op, opsel, dvoice, cact, sact, song, song_do, oct, chaos, bank_do;
     int8_t learn_src, learn_slot;
     uint8_t force, d_hdr, d_vis, d_prm, printing, undo_ok;
     uint32_t vis_due, msg_until, sel_t0, rolls, rng;
@@ -280,10 +281,29 @@ static void save_sound(void)
     fl_put_sector(VB_FL_SOUND(vb_track_sound[ui.track]), vb_sec);
 }
 
+static uint32_t vb_dirty_snd[2];                                   /* bank sounds changed since the last save */
+static vb_recipe_t vb_scratch __attribute__((section(".pool")));
+static void save_other(uint32_t s)                                 /* a sound not on screen: its stored generations kept */
+{
+    int cg = 0, n = -1;
+    if (!st_read(VB_FL_SOUND(s), vb_sec, VB_SECTOR))
+        n = vb_sound_unpack(vb_sec, &vb_scratch, vb_gen, VB_GENS, &cg);
+    if (vb_sound_pack(&vb_bank[s], vb_gen, n > 0 ? n : 0, cg, vb_sec) >= 0)
+        fl_put_sector(VB_FL_SOUND(s), vb_sec);
+}
 static void vb_save_now(void)
 {
+    uint32_t s, cur = vb_track_sound[ui.track], others = 0;
     vb_st.saving = 1;
     save_sound();
+    for (s = 0; s < VB_BANK; s++)
+        if (s != cur && ((vb_dirty_snd[s >> 5] >> (s & 31u)) & 1u)) {
+            save_other(s);
+            others = 1;
+        }
+    vb_dirty_snd[0] = vb_dirty_snd[1] = 0;
+    if (others)
+        load_gens(cur);                                            /* (vb_gen held the others for a moment) */
     save_settings();
     if (vb_st.audio_dirty)
         save_audio();
@@ -293,6 +313,8 @@ static void vb_save_now(void)
 }
 static void touch(void)                                            /* something changed: save when it's quiet */
 {
+    uint32_t s = vb_track_sound[ui.track];
+    vb_dirty_snd[s >> 5] |= 1u << (s & 31u);
     vb_st.dirty = 1;
     vb_st.due = fm1_ms + 2500u;
 }
@@ -304,6 +326,104 @@ static void vb_autosave(void)
         vb_save_now();
         say("SAVED");
     }
+}
+
+/* ---- songs: which bank sound each of the 4 tracks plays, the tempo and CHAOS. The parts (chords, steps) live in the
+ * sounds, so a song is small: 64 of them in one sector. Two songs with different parts of one sound: COPY it (BANK). */
+#define VB_FL_SONG 0x000DD000u                                     /* 1 sector; 0xDE000..0xE0000 free */
+#define VB_SONGS 64
+#define VB_SONG_BYTES 64u
+#define VB_SONG_MAGIC 0x32475356u                                  /* "VSG2" */
+typedef struct {
+    uint32_t magic;
+    uint16_t crc, bpm10;
+    uint8_t snd[VB_TRACKS];
+    uint8_t chaos, pad[3];
+} vb_song_t;
+typedef char vb_song_fits[sizeof(vb_song_t) <= VB_SONG_BYTES ? 1 : -1];
+static uint32_t song_off(uint32_t i) { return VB_FL_SONG + i * VB_SONG_BYTES; }
+static uint16_t song_crc(const vb_song_t *g) { return vb_crc16((const uint8_t *)g + 8, sizeof *g - 8u); }
+static int song_read(uint32_t i, vb_song_t *g)                     /* 0: a stored song */
+{
+    if (!flash_ok || i >= VB_SONGS || st_read(song_off(i), g, sizeof *g))
+        return -1;
+    return g->magic == VB_SONG_MAGIC && g->crc == song_crc(g) ? 0 : -1;
+}
+static vb_song_t vb_song;
+static void load_track(uint32_t t);
+static void song_save(uint32_t i)
+{
+    uint32_t t, k;
+    const uint8_t *b = (const uint8_t *)&vb_song;
+    if (vb_pl.playing || vb_pl.rec) {
+        say("STOP, THEN SAVE");
+        return;
+    }
+    vb_song.magic = VB_SONG_MAGIC;
+    vb_song.bpm10 = (uint16_t)vb_pl.bpm10;
+    vb_song.chaos = ui.chaos;
+    vb_song.pad[0] = vb_song.pad[1] = vb_song.pad[2] = 0;
+    for (t = 0; t < VB_TRACKS; t++)
+        vb_song.snd[t] = vb_track_sound[t];
+    vb_song.crc = song_crc(&vb_song);
+    say("SAVING SONG");
+    vb_draw_now();
+    vb_save_now();                                                 /* the parts it plays, saved with it (uses vb_sec) */
+    if (st_read(VB_FL_SONG, vb_sec, VB_SECTOR))
+        return;
+    for (k = 0; k < VB_SONG_BYTES; k++)
+        vb_sec[i * VB_SONG_BYTES + k] = k < sizeof vb_song ? b[k] : 0xFFu;
+    fl_put_sector(VB_FL_SONG, vb_sec);
+    say("SONG SAVED");
+}
+static void song_load(uint32_t i)
+{
+    uint32_t t;
+    if (song_read(i, &vb_song)) {
+        say("EMPTY SONG");
+        return;
+    }
+    for (t = 0; t < VB_TRACKS; t++)
+        vb_track_sound[t] = vb_song.snd[t] < VB_BANK ? vb_song.snd[t] : (uint8_t)t;
+    vb_pl.bpm10 = vb_song.bpm10 >= 400u && vb_song.bpm10 <= 3000u ? vb_song.bpm10 : 1200;
+    ui.chaos = vb_song.chaos <= 100 ? vb_song.chaos : ui.chaos;
+    load_track(ui.track);
+    touch();
+    say("SONG LOADED");
+}
+/* COPY (BANK): the sound on the track into the first bank slot nothing uses yet, and the track onto it */
+static int slot_free(uint32_t s)
+{
+    uint32_t t;
+    for (t = 0; t < VB_TRACKS; t++)
+        if (vb_track_sound[t] == s)
+            return 0;
+    if (!flash_ok || st_read(VB_FL_SOUND(s), vb_sec2, 4))
+        return 0;
+    return vb_sec2[0] == 0xFFu && vb_sec2[1] == 0xFFu && !((vb_dirty_snd[s >> 5] >> (s & 31u)) & 1u);
+}
+static void sound_copy(void)
+{
+    uint32_t s;
+    char m[24] = "COPIED TO ";
+    if (vb_pl.playing || vb_pl.rec) {
+        say("STOP, THEN COPY");
+        return;
+    }
+    for (s = 0; s < VB_BANK && !slot_free(s); s++)
+        ;
+    if (s == VB_BANK) {
+        say("BANK FULL");
+        return;
+    }
+    vb_bank[s] = *RC;
+    vb_dirty_snd[s >> 5] |= 1u << (s & 31u);
+    vb_save_now();                                                 /* the original and the copy */
+    vb_track_sound[ui.track] = (uint8_t)s;
+    load_track(ui.track);
+    touch();
+    utoa10(m + 10, s + 1u);
+    say(m);
 }
 
 static void load_gens(uint32_t sound)
@@ -389,7 +509,8 @@ static void vb_init(void)
 
 /* ---- cells: what a knob edits */
 enum { F_NUM, F_LIST, F_S24, F_S64, F_PCT, F_NOTE, F_LEN, F_HALF, F_DEST, F_AMT, F_HZ };
-enum { K_U8, K_ROOT, K_CTYPE, K_CNOTE, K_FXTYPE, K_MOVE, K_DEST, K_AMT, K_BPM, K_CHAOS, K_SOUND, K_GEN, K_DO, K_STEPS };
+enum { K_U8, K_ROOT, K_CTYPE, K_CNOTE, K_FXTYPE, K_MOVE, K_DEST, K_AMT, K_BPM, K_CHAOS, K_SOUND, K_GEN, K_DO, K_STEPS, K_VOI,
+       K_BASS, K_SONG };
 typedef struct {
     const char *label;
     uint8_t kind, fmt;
@@ -399,7 +520,8 @@ typedef struct {
     vb_addr_t addr;                                        /* modulation destination (VB_ADDR_NONE: none) */
     uint8_t arg;
 } cell_t;
-static cell_t C[5][4];
+#define NROWS 6
+static cell_t C[NROWS][4];
 static uint32_t NR;
 
 static void cl(uint32_t r, uint32_t c, const char *label, uint8_t kind, uint8_t fmt, uint8_t *p, int min, int max,
@@ -436,7 +558,10 @@ static const char *const START_N[2] = {"GRID", "FREE"};
 static const char *const AFTER_N[2] = {"FLAT", "KEEP"};
 static const char *const TAIL_N[4] = {"AUTO", ".5S", "1S", "2S"};
 static const char *const FMT_N[2] = {"PCM", "ADPCM"};
-static const char *const DO_N[3] = {"LOAD", "EDIT", "RBLD"};
+static const char *const DO_N[4] = {"LOAD", "EDIT", "RBLD", "COPY"};
+static const char *const SONGDO_N[2] = {"LOAD", "SAVE"};
+static const char *const CACT_N[3] = {"INS", "DUP", "DEL"};
+static const char *const SACT_N[4] = {"ON/OFF", "INS", "DUP", "DEL"};
 static const char *const SAMP_LBL[8] = {"START", "LEN", "LOOP", "REV", "PITCH", "FINE", "FADE", "GAIN"};
 static const char *const SAMP_LOOP_N[3] = {"OFF", "FWD", "P-P"};
 
@@ -444,7 +569,7 @@ static void build_rows(void)
 {
     uint32_t r, c;
     vb_play_t *pl = &RC->play;
-    for (r = 0; r < 5u; r++)
+    for (r = 0; r < NROWS; r++)
         for (c = 0; c < 4u; c++)
             C[r][c].label = 0;
     NR = 1;
@@ -503,17 +628,20 @@ static void build_rows(void)
             vb_chord_t *ch = &pl->chord[pl->sel % VB_CHORD_STEPS];
             uint32_t i;
             cl(1, 0, "ROOT", K_ROOT, F_LIST, &ch->root, 0, 11, NOTE_NM, VB_ADDR_NONE, 0);
-            cl(1, 1, "TYPE", K_CTYPE, F_LIST, &ch->type, 0, 10, vb_chord_type_name, VB_ADDR_NONE, 0);
+            cl(1, 1, "TYPE", K_CTYPE, F_LIST, &ch->type, 0, VB_CHORD_TYPES - 1, vb_chord_type_name, VB_ADDR_NONE, 0);
             cl(1, 2, "LEN", K_U8, F_LEN, &ch->len_i, 0, 11, 0, VB_ADDR_NONE, 0);
             cl(1, 3, "GATE", K_U8, F_PCT, &ch->gate, 5, 100, 0, VB_ADDR_NONE, 0);
-            for (i = 0; i < 4u; i++) {
-                static const char *const NL[4] = {"N1", "N2", "N3", "N4"};
-                cl(2, i, NL[i], K_CNOTE, F_NOTE, 0, 23, 108, 0, VB_ADDR_NONE, (uint8_t)i);
+            cl(2, 0, "VOICING", K_VOI, F_LIST, &ch->voi, 0, VB_VOICINGS - 1, vb_voicing_name, VB_ADDR_NONE, 0);
+            cl(2, 1, "BASS", K_BASS, F_NUM, &ch->bass, 0, VB_CHORD_NOTES, 0, VB_ADDR_NONE, 0);
+            cl(2, 2, "STEPS", K_STEPS, F_NUM, &pl->len, 1, VB_CHORD_STEPS, 0, VB_ADDR_NONE, 0);
+            cl(2, 3, "EDIT", K_U8, F_LIST, &ui.cact, 0, 2, CACT_N, VB_ADDR_NONE, 0);
+            for (i = 0; i < 8u; i++) {
+                static const char *const NL[8] = {"N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8"};
+                cl(3 + i / 4u, i % 4u, NL[i], K_CNOTE, F_NOTE, 0, 23, 108, 0, VB_ADDR_NONE, (uint8_t)i);
             }
-            cl(3, 0, "VEL", K_U8, F_NUM, &pl->vel, 1, 127, 0, VB_ADDR(VB_D_PLAY, 2), 0);
-            cl(3, 1, "SPRD", K_U8, F_NUM, &pl->sprd, 0, 127, 0, VB_ADDR(VB_D_PLAY, 3), 0);
-            cl(3, 2, "STEPS", K_STEPS, F_NUM, &pl->len, 1, VB_CHORD_STEPS, 0, VB_ADDR_NONE, 0);
-            NR = 4;
+            cl(5, 0, "VEL", K_U8, F_NUM, &pl->vel, 1, 127, 0, VB_ADDR(VB_D_PLAY, 2), 0);
+            cl(5, 1, "SPRD", K_U8, F_NUM, &pl->sprd, 0, 127, 0, VB_ADDR(VB_D_PLAY, 3), 0);
+            NR = 6;
         } else if (pl->mode == VB_PLAY_SEQ) {
             vb_step_t *st = &pl->seq[pl->sel % VB_SEQ_STEPS];
             cl(1, 0, "NOTE", K_U8, F_NOTE, &st->note, 24, 108, 0, VB_ADDR_NONE, 0);
@@ -523,6 +651,7 @@ static void build_rows(void)
             cl(2, 0, "VEL", K_U8, F_NUM, &pl->vel, 1, 127, 0, VB_ADDR(VB_D_PLAY, 2), 0);
             cl(2, 1, "RATE", K_U8, F_LIST, &pl->rate, 0, 2, RATE_N, VB_ADDR_NONE, 0);
             cl(2, 2, "STEPS", K_STEPS, F_NUM, &pl->len, 1, VB_SEQ_STEPS, 0, VB_ADDR_NONE, 0);
+            cl(2, 3, "EDIT", K_U8, F_LIST, &ui.sact, 0, 3, SACT_N, VB_ADDR_NONE, 0);
             NR = 3;
         } else {
             cl(1, 0, "VEL", K_U8, F_NUM, &pl->vel, 1, 127, 0, VB_ADDR(VB_D_PLAY, 2), 0);
@@ -581,8 +710,10 @@ static void build_rows(void)
     case PG_BANK:
         cl(0, 0, "SOUND", K_SOUND, F_NUM, 0, 1, VB_BANK, 0, VB_ADDR_NONE, 0);
         cl(0, 1, "GEN", K_GEN, F_NUM, 0, 0, VB_GENS, 0, VB_ADDR_NONE, 0);
-        cl(0, 2, "DO", K_DO, F_LIST, &ui.bank_do, 0, 2, DO_N, VB_ADDR_NONE, 0);
-        NR = 1;
+        cl(0, 2, "DO", K_DO, F_LIST, &ui.bank_do, 0, 3, DO_N, VB_ADDR_NONE, 0);
+        cl(1, 0, "SONG", K_SONG, F_NUM, &ui.song, 0, VB_SONGS - 1, 0, VB_ADDR_NONE, 0);
+        cl(1, 1, "DO", K_U8, F_LIST, &ui.song_do, 0, 1, SONGDO_N, VB_ADDR_NONE, 0);
+        NR = 2;
         break;
     case PG_GLO:
         cl(0, 0, "BPM", K_BPM, F_NUM, 0, 40, 300, 0, VB_ADDR_NONE, 0);
@@ -601,6 +732,7 @@ static int cell_get(const cell_t *x)
     vb_chord_t *ch = &RC->play.chord[RC->play.sel % VB_CHORD_STEPS];
     switch (x->kind) {
     case K_CNOTE: return x->arg < ch->n ? ch->note[x->arg] : 23;
+    case K_BASS: return ch->bass;
     case K_MOVE: return (ui.op & 7) + 1;
     case K_DEST: {
         vb_addr_t list[200];
@@ -627,6 +759,18 @@ static void cell_text(const cell_t *x, char *b)
     case K_FXTYPE: str_cpy(b, vb_fx_types[v].name, 12); return;
     case K_DEST: vb_addr_name(RC, m->r[x->arg].dest, b, 12); return;
     case K_GEN: str_cpy(b, "G", 4); utoa10(b + 1, (uint32_t)v); return;
+    case K_SONG: str_cpy(b, "S", 4); utoa10(b + 1, (uint32_t)v + 1u); return;
+    case K_BASS: {                                         /* the chord tone in the bass: "2 E" */
+        uint8_t pcs[12];
+        int n = vb_chord_tones(&RC->play.chord[RC->play.sel % VB_CHORD_STEPS], pcs);
+        if (!v || !n) {
+            str_cpy(b, "-", 4);
+            return;
+        }
+        utoa10(b, (uint32_t)v);
+        cat(b, NOTE_NM[pcs[(v - 1) % n]], 8);
+        return;
+    }
     case K_CNOTE:
         if (v == 23)
             str_cpy(b, "-", 4);
@@ -691,10 +835,11 @@ static void cell_set(const cell_t *x, int v)
     vb_chord_t *ch = &RC->play.chord[RC->play.sel % VB_CHORD_STEPS];
     v = clampi(v, x->min, x->max);
     switch (x->kind) {
-    case K_ROOT: {                                         /* moves the whole voicing */
+    case K_ROOT: {                                         /* moves the whole voicing, and the BASS */
         int d = v - ch->root, i;
         for (i = 0; i < ch->n; i++)
             ch->note[i] = (uint8_t)clampi(ch->note[i] + d, 24, 108);
+
         ch->root = (uint8_t)v;
         break;
     }
@@ -707,6 +852,9 @@ static void cell_set(const cell_t *x, int v)
         break;
     }
     case K_CNOTE: chord_set_note(ch, x->arg, v); break;
+    case K_BASS: ch->bass = (uint8_t)v; break;
+    case K_VOI: vb_chord_voice(ch, v); break;
+    case K_SONG: ui.song = (uint8_t)v; ui.d_vis = ui.d_prm = 1; return;
     case K_FXTYPE: {
         vb_fx_slot_t *f = &RC->fx[ui.op & 7u];
         f->type = (uint8_t)v;
@@ -763,6 +911,10 @@ static int cell_max(const cell_t *x)
     }
     if (x->kind == K_GEN)
         return vb_ngen ? vb_ngen - 1 : 0;
+    if (x->kind == K_BASS) {
+        uint8_t pcs[12];
+        return vb_chord_tones(&RC->play.chord[RC->play.sel % VB_CHORD_STEPS], pcs);
+    }
     return x->max;
 }
 
@@ -936,6 +1088,11 @@ static void print_poll(void)
 }
 static void bank_do(void)
 {
+    if (ui.bank_do == 3) {
+        sound_copy();
+        dirty();
+        return;
+    }
     if (!vb_ngen) {
         say("NO GENERATIONS");
         return;
@@ -1000,6 +1157,135 @@ static void goto_page(uint32_t pg)
     }
     dirty();
 }
+/* EDIT on PLAY (SEL runs it): insert an empty step, duplicate the selected one, delete it; SEQ also toggles ON */
+static void step_edit(void)
+{
+    vb_play_t *pl = &RC->play;
+    int seq = pl->mode == VB_PLAY_SEQ, max = seq ? VB_SEQ_STEPS : VB_CHORD_STEPS, len = pl->len ? pl->len : 1, i;
+    int sel = pl->sel % max, act = seq ? ui.sact : ui.cact + 1;        /* 0 ON/OFF, 1 INS, 2 DUP, 3 DEL */
+    if (pl->mode == VB_PLAY_NOTE)
+        return;
+    if (act == 0) {
+        pl->seq[sel].on ^= 1u;
+    } else if (act == 3) {
+        if (len <= 1) {
+            say("ONE STEP LEFT");
+            return;
+        }
+        for (i = sel; i + 1 < max; i++) {
+            if (seq)
+                pl->seq[i] = pl->seq[i + 1];
+            else
+                pl->chord[i] = pl->chord[i + 1];
+        }
+        pl->len = (uint8_t)(len - 1);
+        pl->sel = (uint8_t)(sel >= len - 1 ? len - 2 : sel);
+        say("STEP DELETED");
+    } else {
+        if (len >= max) {
+            say(seq ? "16 STEPS: FULL" : "16 CHORDS: FULL");
+            return;
+        }
+        for (i = max - 1; i > sel + 1; i--) {
+            if (seq)
+                pl->seq[i] = pl->seq[i - 1];
+            else
+                pl->chord[i] = pl->chord[i - 1];
+        }
+        if (seq) {
+            pl->seq[sel + 1] = pl->seq[sel];
+            if (act == 1)
+                pl->seq[sel + 1].on = 0;
+        } else {
+            pl->chord[sel + 1] = pl->chord[sel];
+            if (act == 1) {
+                pl->chord[sel + 1].n = 0;
+                pl->chord[sel + 1].bass = 0;
+            }
+        }
+        pl->len = (uint8_t)(len + 1);
+        pl->sel = (uint8_t)(sel + 1);
+        say(act == 1 ? "STEP INSERTED" : "STEP COPIED");
+    }
+    touch();
+    dirty();
+}
+/* OCT- / OCT+ on PLAY: the selected chord (its BASS too) or step an octave down / up */
+static int step_octave(int d)
+{
+    vb_play_t *pl = &RC->play;
+    int i;
+    if (ui.page != PG_PLAY || pl->mode == VB_PLAY_NOTE)
+        return 0;
+    if (pl->mode == VB_PLAY_SEQ) {
+        vb_step_t *st = &pl->seq[pl->sel % VB_SEQ_STEPS];
+        if (st->note + d < 24 || st->note + d > 108) {
+            say("OUT OF RANGE");
+            return 1;
+        }
+        st->note = (uint8_t)(st->note + d);
+    } else {
+        vb_chord_t *ch = &pl->chord[pl->sel % VB_CHORD_STEPS];
+        for (i = 0; i < ch->n; i++)
+            if (ch->note[i] + d < 24 || ch->note[i] + d > 108) {
+                say("OUT OF RANGE");
+                return 1;
+            }
+        for (i = 0; i < ch->n; i++)
+            ch->note[i] = (uint8_t)(ch->note[i] + d);
+    }
+    say(d > 0 ? "STEP +12" : "STEP -12");
+    touch();
+    ui.d_vis = ui.d_prm = 1;
+    return 1;
+}
+/* SEL on the MOD page's shape rows: a new shape for the LFO / envelope; with no destination yet, one or two random ones */
+static void mod_randomize(void)
+{
+    vb_modsrc_t *m = &RC->mod[ui.op % VB_MODSRC];
+    uint32_t k, live = 0, want;
+    char b[28];
+    undo_mark();
+    if (!m->kind) {
+        if ((int)(rnd() % 100u) < ui.chaos)
+            m->wave = (uint8_t)(rnd() % 7u);
+        m->rate = mixr(m->rate, 0, 127);
+        if ((int)(rnd() % 100u) < ui.chaos)
+            m->sync = (uint8_t)(rnd() % 10u < 6u);
+        if ((int)(rnd() % 100u) < ui.chaos)
+            m->trig = (uint8_t)(rnd() % 5u);
+        m->phase = mixr(m->phase, 0, 127);
+    } else {
+        m->atk = mixr(m->atk, 0, 127);
+        m->dec = mixr(m->dec, 0, 127);
+        m->sus = mixr(m->sus, 0, 127);
+        m->rel = mixr(m->rel, 0, 127);
+        if ((int)(rnd() % 100u) < ui.chaos / 2)
+            m->loop = (uint8_t)(rnd() % 3u);
+    }
+    for (k = 0; k < VB_ROUTES; k++)
+        live += m->r[k].dest != VB_ADDR_NONE && m->r[k].amt;
+    if (!live) {
+        vb_addr_t list[200];
+        int n = vb_addr_list(RC, list, 200);
+        want = 1u + rnd() % 2u;
+        for (k = 0; k < VB_ROUTES && want && n > 0; k++)
+            if (m->r[k].dest == VB_ADDR_NONE || !m->r[k].amt) {
+                vb_addr_t a = list[rnd() % (uint32_t)n];
+                if ((a >> 8) == VB_D_MOD && (a & 0xFFu) / 8u == ui.op % VB_MODSRC)
+                    continue;                                  /* not onto itself */
+                m->r[k].dest = a;
+                m->r[k].amt = (int8_t)((rnd() & 1u ? 1 : -1) * (int)(12u + rnd() % 40u) * (40 + 60 * ui.chaos / 100) / 100);
+                want--;
+            }
+    }
+    ui.rolls++;
+    str_cpy(b, m->kind ? "RANDOM ENV #" : "RANDOM LFO #", sizeof b);
+    utoa10(b + str_len(b), ui.rolls);
+    say(b);
+    touch();
+    dirty();
+}
 static void sel_tap(void)
 {
     switch (ui.page) {
@@ -1008,6 +1294,10 @@ static void sel_tap(void)
     case PG_MOD: {
         vb_modsrc_t *m = &RC->mod[ui.op % VB_MODSRC];
         int k;
+        if (ui.learn_src < 0 && ui.row[PG_MOD] != 1 && ui.row[PG_MOD] != 2) {
+            mod_randomize();
+            break;
+        }
         if (ui.learn_src >= 0) {
             ui.learn_src = -1;
             say("LEARN OFF");
@@ -1023,14 +1313,18 @@ static void sel_tap(void)
         break;
     }
     case PG_PRINT: print_start(); break;
-    case PG_BANK: bank_do(); break;
-    case PG_PLAY:
-        if (RC->play.mode == VB_PLAY_SEQ) {
-            vb_step_t *st = &RC->play.seq[RC->play.sel % VB_SEQ_STEPS];
-            st->on ^= 1u;
+    case PG_BANK:
+        if (ui.row[PG_BANK] == 1) {
+            if (ui.song_do)
+                song_save(ui.song);
+            else
+                song_load(ui.song);
             dirty();
+        } else {
+            bank_do();
         }
         break;
+    case PG_PLAY: step_edit(); break;
     }
 }
 static void press(uint32_t b)
@@ -1082,6 +1376,8 @@ static void press(uint32_t b)
     case B_REC: print_start(); break;
     case B_SCL: ui.sel_t0 = fm1_ms ? fm1_ms : 1u; break;
     case B_OCTDN: case B_OCTUP:
+        if (step_octave(b == B_OCTUP ? 12 : -12))
+            break;
         ui.oct = (uint8_t)clampi(ui.oct + (b == B_OCTUP ? 1 : -1), 0, 4);
         {
             char m[12] = "OCT ";
@@ -1111,7 +1407,7 @@ static void key(uint32_t n, int down)
         else if (ch->n < VB_CHORD_NOTES)
             ch->note[ch->n++] = (uint8_t)note;
         else
-            say("MAX 6 NOTES");
+            say("MAX 8 NOTES");
         ui.d_vis = ui.d_prm = 1;
     } else if (ui.page == PG_PLAY && pl->mode == VB_PLAY_SEQ) {
         vb_step_t *st = &pl->seq[pl->sel % VB_SEQ_STEPS];
@@ -1172,7 +1468,12 @@ static void vb_input(void)
             break;
         case PG_MOD: ui.op = (uint8_t)clampi(ui.op + s, 0, VB_MODSRC - 1); break;
         case PG_FX: ui.op = (uint8_t)clampi(ui.op + s, 0, VB_FX_SLOTS - 1); break;
-        case PG_BANK: vb_curgen = (uint8_t)clampi(vb_curgen + s, 0, vb_ngen ? vb_ngen - 1 : 0); break;
+        case PG_BANK:
+            if (ui.row[PG_BANK] == 1)
+                ui.song = (uint8_t)clampi(ui.song + s, 0, VB_SONGS - 1);
+            else
+                vb_curgen = (uint8_t)clampi(vb_curgen + s, 0, vb_ngen ? vb_ngen - 1 : 0);
+            break;
         }
         dirty();
     }
@@ -1206,11 +1507,12 @@ static void vb_input(void)
             continue;
         }
         ui.undo_ok = 0;                                    /* a hand edit ends the series of rolls */
-        step = (x->fmt == F_LIST || x->kind == K_DEST || x->kind == K_CNOTE || x->kind == K_GEN) ? (d > 0 ? 1 : -1)
+        step = (x->fmt == F_LIST || x->kind == K_DEST || x->kind == K_CNOTE || x->kind == K_GEN || x->kind == K_BASS)
+               ? (d > 0 ? 1 : -1)
                : d * (d > 1 || d < -1 ? 4 : 1);
         {
             int nv = cell_get(x) + step;
-            if (x->kind == K_DEST)
+            if (x->kind == K_DEST || x->kind == K_BASS)
                 nv = clampi(nv, 0, cell_max(x));
             cell_set(x, nv);
         }
@@ -1342,7 +1644,8 @@ static void draw_hdr(void)
     uint32_t r;
     build_rows();
     cv_begin(240, 40, C_BG);
-    str_cpy(t, ui.page == PG_SRC ? SRC_N[RC->src] : ui.page == PG_PLAY ? MODE_N[RC->play.mode] : PG_NAME[ui.page], sizeof t);
+    str_cpy(t, ui.page == PG_SRC ? SRC_N[RC->src] : ui.page == PG_PLAY ? MODE_N[RC->play.mode] :
+               ui.page == PG_BANK && ui.row[PG_BANK] == 1 ? "SONG" : PG_NAME[ui.page], sizeof t);
     if (md_text_w(&MD_F3, 4, t) > 104)
         md_text(8, 12, &MD_F3, 3, t, C_INK);
     else
@@ -1521,21 +1824,40 @@ static void vis_play(void)
             }
             x += w;
         }
-        vb_chord_name(&pl->chord[pl->sel % VB_CHORD_STEPS], t, 12);
-        md_text(8, 58, &MD_F3, 5, t, C_INK);
+        vb_chord_name(&pl->chord[pl->sel % VB_CHORD_STEPS], t, 16);
+        {
+            uint32_t sc = 5;                                /* long names (Cm7(9,11)) one size down, then more */
+            while (sc > 2u && md_text_w(&MD_F3, sc, t) > 136)
+                sc--;
+            md_text(8, 58 + (int32_t)(5u - sc) * 5 / 2, &MD_F3, sc, t, C_INK);
+        }
         str_cpy(t, vb_len_name[pl->chord[pl->sel].len_i % 12u], sizeof t);
         md_text(150, 60, &MD_F3, 2, t, C_INK);
         str_cpy(t, vb_strum_name[pl->strum], sizeof t);
         md_text(150, 76, &MD_F3, 2, t, C_INK);
-        {   /* the notes */
-            const vb_chord_t *ch = &pl->chord[pl->sel];
-            int32_t xx = 8;
+        {   /* the BASS, then the notes */
+            const vb_chord_t *ch = &pl->chord[pl->sel % VB_CHORD_STEPS];
+            char ln[64], nn[6];
+            ln[0] = 0;
+            if (vb_chord_bass(ch)) {
+                note_name(nn, vb_chord_bass(ch));
+                cat(ln, nn, sizeof ln);
+                cat(ln, " |", sizeof ln);
+            }
             for (i = 0; i < ch->n; i++) {
-                note_name(t, ch->note[i]);
-                xx = md_text(xx, 102, &MD_F3, 2, t, C_INK) + 8;
+                note_name(nn, ch->note[i]);
+                if (ln[0])
+                    cat(ln, " ", sizeof ln);
+                cat(ln, nn, sizeof ln);
             }
             if (!ch->n)
-                md_text(8, 102, &MD_F3, 2, "KEYS ADD NOTES", C_INK);
+                str_cpy(ln, "KEYS ADD NOTES", sizeof ln);
+            {
+                uint32_t sc = 2;
+                if (md_text_w(&MD_F3, 2, ln) > 228)
+                    sc = 1;
+                md_text(8, sc == 2u ? 102 : 104, &MD_F3, sc, ln, C_INK);
+            }
         }
     } else if (pl->mode == VB_PLAY_SEQ) {
         for (i = 0; i < VB_SEQ_STEPS; i++) {
@@ -1648,8 +1970,44 @@ static void vis_print_page(void)
     }
 }
 
+static void vis_songs(void)
+{
+    char t[40];
+    uint32_t i, first = ui.song > 1u ? ui.song - 1u : 0u, k;
+    if (first + 4u > VB_SONGS)
+        first = VB_SONGS - 4u;
+    md_text(8, 6, &MD_F3, 2, "4 TRACKS, THEIR PARTS, BPM", C_INK);
+    for (i = first; i < first + 4u; i++) {
+        int32_t y = 26 + (int32_t)(i - first) * 19;
+        int s = i == ui.song;
+        vb_song_t *g = &vb_song;                            /* (the song buffer: only used here and in LOAD / SAVE) */
+        if (s)
+            cv_rect(4, y - 3, 232, 17, C_INK);
+        str_cpy(t, "S", sizeof t);
+        utoa10(t + 1, i + 1u);
+        cat(t, i < 9u ? "  " : " ", sizeof t);
+        if (song_read(i, g)) {
+            cat(t, "-", sizeof t);
+        } else {
+            for (k = 0; k < VB_TRACKS; k++) {
+                char n[4];
+                utoa10(n, g->snd[k] + 1u);
+                cat(t, n, sizeof t);
+                cat(t, k + 1u < VB_TRACKS ? "." : " ", sizeof t);
+            }
+            utoa10(t + str_len(t), g->bpm10 / 10u);
+        }
+        md_text(10, y, &MD_F3, 2, t, s ? C_BG : C_INK);
+    }
+    md_text(8, 106, &MD_F3, 2, "SEL = LOAD / SAVE", C_INK);
+}
+
 static void vis_bank(void)
 {
+    if (ui.row[PG_BANK] == 1) {
+        vis_songs();
+        return;
+    }
     char t[24];
     uint32_t i, first = vb_curgen > 3u ? vb_curgen - 3u : 0u;
     str_cpy(t, "SOUND ", sizeof t);

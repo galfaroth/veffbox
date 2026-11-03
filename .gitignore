@@ -7,3 +7,4 @@ dist/
 host/shot
 host/shots/
 *.dSYM/
+host/ui_test

@@ -23,6 +23,6 @@ typedef struct vb_engine {
 /* the most voice state any engine may use (the app allocates voices statically) */
 #define VB_VOICE_BYTES 256
 /* polyphony: one chord of up to 6 notes, plus release tails */
-#define VB_POLY 8
+#define VB_POLY 10                       /* 8 chord notes and a BASS, with one to spare for a release */
 
 #endif

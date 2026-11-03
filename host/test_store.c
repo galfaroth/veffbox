@@ -3,6 +3,7 @@
  * a corrupted sector is refused; a sound with very different generations drops the oldest; ADPCM round trip. */
 #include <stdio.h>
 #include <string.h>
+#include <stddef.h>
 #include "../core/vb_store.h"
 #include "../core/vb_dsp.h"
 
@@ -52,6 +53,147 @@ int main(void)
     for (g = 0; g < n; g++)
         CHECK(memcmp(&gens[VB_MAXGEN - n + g].rc, &back[g].rc, sizeof cur) == 0, "kept generation %d differs", g);
     printf("very different generations: kept the last %d\n", n);
+
+    /* format 1 (to 0.2.2: chords of 6 notes): a stored sound and its generation come back converted */
+    {
+        typedef struct { uint8_t note[6]; uint8_t n, root, type, len_i, gate; } c1_t;
+        typedef struct { uint8_t mode, strum, time, hum, vel, sprd, rate, len, sel; c1_t chord[8];
+                         vb_step_t seq[VB_SEQ_STEPS]; } p1_t;
+        typedef struct { uint8_t src, op4[VB_OP4_NP], anlg[VB_ANLG_NP]; vb_drum_patch_t drum; uint8_t samp[VB_SAMP_NP],
+                         gran[VB_GRAN_NP], chop[VB_CHOP_NP]; p1_t play; vb_modsrc_t mod[VB_MODSRC];
+                         vb_fx_slot_t fx[VB_FX_SLOTS]; uint8_t print[VB_PRINT_NP], pnote; uint16_t bpm10; uint32_t seed; } r1_t;
+        static r1_t o;
+        vb_recipe_t want;
+        uint32_t len, k;
+        uint16_t c;
+        vb_recipe_default(&want, 77);
+        want.src = VB_SRC_ANLG;
+        want.play.chord[3].note[2] = 70;
+        want.fx[2].type = 5;
+        memset(&o, 0, sizeof o);
+        o.src = want.src;
+        memcpy(o.op4, want.op4, sizeof o.op4);
+        memcpy(o.anlg, want.anlg, sizeof o.anlg);
+        o.drum = want.drum;
+        memcpy(o.samp, want.samp, sizeof o.samp);
+        memcpy(o.gran, want.gran, sizeof o.gran);
+        memcpy(o.chop, want.chop, sizeof o.chop);
+        memcpy(&o.play, &want.play, 9);
+        for (k = 0; k < 8; k++) {
+            memcpy(o.play.chord[k].note, want.play.chord[k].note, 6);
+            o.play.chord[k].n = want.play.chord[k].n;
+            o.play.chord[k].root = want.play.chord[k].root;
+            o.play.chord[k].type = want.play.chord[k].type;
+            o.play.chord[k].len_i = want.play.chord[k].len_i;
+            o.play.chord[k].gate = want.play.chord[k].gate;
+        }
+        memcpy(o.play.seq, want.play.seq, sizeof o.play.seq);
+        memcpy(o.mod, want.mod, sizeof o.mod);
+        memcpy(o.fx, want.fx, sizeof o.fx);
+        memcpy(o.print, want.print, sizeof o.print);
+        o.pnote = want.pnote;
+        o.bpm10 = want.bpm10;
+        o.seed = want.seed;
+        memset(sec, 0xFF, sizeof sec);
+        memcpy(sec + 12, &o, sizeof o);
+        len = sizeof o;
+        sec[12 + len] = 0xFF;                              /* one generation: parent -1, no audio, one run: SRC = DRUM */
+        sec[12 + len + 1] = 0;
+        sec[12 + len + 2] = 4;
+        sec[12 + len + 3] = 0;
+        sec[12 + len + 4] = 0;
+        sec[12 + len + 5] = 0;
+        sec[12 + len + 6] = 1;
+        sec[12 + len + 7] = VB_SRC_DRUM;
+        len += 8;
+        memcpy(sec, "VBS1", 4);
+        sec[4] = (uint8_t)len; sec[5] = (uint8_t)(len >> 8);
+        c = vb_crc16(sec + 12, len);
+        sec[6] = (uint8_t)c; sec[7] = (uint8_t)(c >> 8);
+        sec[8] = (uint8_t)sizeof o; sec[9] = (uint8_t)(sizeof o >> 8);
+        sec[10] = 1;
+        sec[11] = 0;
+        memset(&cur2, 0, sizeof cur2);
+        CHECK(vb_sound_unpack(sec, &cur2, back, VB_MAXGEN, &cg) == 1, "a format 1 sound was refused");
+        CHECK(memcmp(&cur2, &want, sizeof want) == 0, "format 1: the recipe changed in the conversion");
+        CHECK(back[0].rc.src == VB_SRC_DRUM && back[0].rc.play.chord[3].note[2] == 70 && back[0].rc.fx[2].type == 5,
+              "format 1: the generation's delta");
+        printf("format 1 (%u B) converts to format 3 (%u B)\n", (unsigned)sizeof o, (unsigned)sizeof want);
+    }
+
+    /* format 2 (0.3.0 test builds: 8 notes, the BASS a MIDI note): a stored sound and its generation come back converted */
+    {
+        typedef struct { uint8_t note[8]; uint8_t n, root, type, len_i, gate, bass, voi; } c1_t;
+        typedef struct { uint8_t mode, strum, time, hum, vel, sprd, rate, len, sel; c1_t chord[8];
+                         vb_step_t seq[VB_SEQ_STEPS]; } p1_t;
+        typedef struct { uint8_t src, op4[VB_OP4_NP], anlg[VB_ANLG_NP]; vb_drum_patch_t drum; uint8_t samp[VB_SAMP_NP],
+                         gran[VB_GRAN_NP], chop[VB_CHOP_NP]; p1_t play; vb_modsrc_t mod[VB_MODSRC];
+                         vb_fx_slot_t fx[VB_FX_SLOTS]; uint8_t print[VB_PRINT_NP], pnote; uint16_t bpm10; uint32_t seed; } r1_t;
+        static r1_t o;
+        vb_recipe_t want;
+        uint32_t len, k;
+        uint16_t c;
+        vb_recipe_default(&want, 77);
+        want.src = VB_SRC_ANLG;
+        want.play.chord[3].note[2] = 70;
+        want.fx[2].type = 5;
+        want.play.chord[1].voi = VB_VOI_OPEN;
+        want.play.chord[1].bass = 2;                       /* Fmaj7 (step 2): its 2nd tone, A, in the bass */
+        memset(&o, 0, sizeof o);
+        o.src = want.src;
+        memcpy(o.op4, want.op4, sizeof o.op4);
+        memcpy(o.anlg, want.anlg, sizeof o.anlg);
+        o.drum = want.drum;
+        memcpy(o.samp, want.samp, sizeof o.samp);
+        memcpy(o.gran, want.gran, sizeof o.gran);
+        memcpy(o.chop, want.chop, sizeof o.chop);
+        memcpy(&o.play, &want.play, 9);
+        for (k = 0; k < 8; k++) {
+            memcpy(o.play.chord[k].note, want.play.chord[k].note, 8);
+            o.play.chord[k].n = want.play.chord[k].n;
+            o.play.chord[k].root = want.play.chord[k].root;
+            o.play.chord[k].type = want.play.chord[k].type;
+            o.play.chord[k].len_i = want.play.chord[k].len_i;
+            o.play.chord[k].gate = want.play.chord[k].gate;
+            o.play.chord[k].voi = want.play.chord[k].voi;
+        }
+        memcpy(o.play.seq, want.play.seq, sizeof o.play.seq);
+        memcpy(o.mod, want.mod, sizeof o.mod);
+        memcpy(o.fx, want.fx, sizeof o.fx);
+        memcpy(o.print, want.print, sizeof o.print);
+        o.pnote = want.pnote;
+        o.bpm10 = want.bpm10;
+        o.seed = want.seed;
+        o.play.chord[1].bass = 33;                         /* A1 as a note in format 2 */
+        memset(sec, 0xFF, sizeof sec);
+        memcpy(sec + 12, &o, sizeof o);
+        len = sizeof o;
+        sec[12 + len] = 0xFF;                              /* one generation: parent -1, no audio, one run: SRC = DRUM */
+        sec[12 + len + 1] = 0;
+        sec[12 + len + 2] = 4;
+        sec[12 + len + 3] = 0;
+        sec[12 + len + 4] = 0;
+        sec[12 + len + 5] = 0;
+        sec[12 + len + 6] = 1;
+        sec[12 + len + 7] = VB_SRC_DRUM;
+        len += 8;
+        memcpy(sec, "VBS1", 4);
+        sec[4] = (uint8_t)len; sec[5] = (uint8_t)(len >> 8);
+        c = vb_crc16(sec + 12, len);
+        sec[6] = (uint8_t)c; sec[7] = (uint8_t)(c >> 8);
+        sec[8] = (uint8_t)sizeof o; sec[9] = (uint8_t)(sizeof o >> 8);
+        sec[10] = 1;
+        sec[11] = 0;
+        memset(&cur2, 0, sizeof cur2);
+        CHECK(vb_sound_unpack(sec, &cur2, back, VB_MAXGEN, &cg) == 1, "a format 2 sound was refused");
+        CHECK(memcmp(&cur2, &want, sizeof want) == 0, "format 2: the recipe changed in the conversion");
+        for (k = 0; k < sizeof want; k++)
+            if (((uint8_t *)&cur2)[k] != ((uint8_t *)&want)[k])
+                printf("  byte %u (play at %u): %u != %u\n", k, (unsigned)offsetof(vb_recipe_t, play), ((uint8_t *)&cur2)[k], ((uint8_t *)&want)[k]);
+        CHECK(back[0].rc.src == VB_SRC_DRUM && back[0].rc.play.chord[3].note[2] == 70 && back[0].rc.fx[2].type == 5,
+              "format 2: the generation's delta");
+        printf("format 2 (%u B) converts to format 3 (%u B)\n", (unsigned)sizeof o, (unsigned)sizeof want);
+    }
 
     /* ADPCM: a decaying chord, the error stays small */
     {

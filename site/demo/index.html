@@ -165,7 +165,7 @@ const LENS=[1,2,3,4,6,8,12,16,24,32,48,64];
 const LENN=['1/16','1/8','3/16','1/4','3/8','1/2','3/4','1 BAR','1½ BAR','2 BAR','3 BAR','4 BAR'];
 const SCALES=['CHROM','MAJ','MIN','DOR','PHRY','PENT'];
 const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const CT=[['MAJ','',[0,4,7]],['MIN','m',[0,3,7]],['7','7',[0,4,7,10]],['MAJ7','maj7',[0,4,7,11]],['MIN7','m7',[0,3,7,10]],['SUS2','sus2',[0,2,7]],['SUS4','sus4',[0,5,7]],['ADD9','add9',[0,4,7,14]],['MIN9','m9',[0,3,7,10,14]],['DIM','°',[0,3,6]],['5','5',[0,7,12]]];
+const CT=[['MAJ','',[0,4,7]],['MIN','m',[0,3,7]],['7','7',[0,4,7,10]],['MAJ7','maj7',[0,4,7,11]],['MIN7','m7',[0,3,7,10]],['SUS2','sus2',[0,2,7]],['SUS4','sus4',[0,5,7]],['ADD9','add9',[0,4,7,14]],['MIN9','m9',[0,3,7,10,14]],['DIM','°',[0,3,6]],['5','5',[0,7,12]],['6','6',[0,4,7,9]],['MIN6','m6',[0,3,7,9]],['6/9','6/9',[0,4,7,9,14]],['MAJ9','maj9',[0,4,7,11,14]],['9','9',[0,4,7,10,14]],['MIN11','m11',[0,3,7,10,14,17]],['7SUS4','7sus4',[0,5,7,10]],['MAJ7#11','maj7#11',[0,4,7,11,18]],['M7B5','m7b5',[0,3,6,10]],['AUG','aug',[0,4,8]],['MADD9','madd9',[0,3,7,14]]];
 const STRUMS=['UP','DOWN','ALT','RND','HARP','LUSH','ARP'];
 const PMODES=['NOTE','SEQ','CHORD'];
 const LFOW=['SIN','TRI','SQR','SAW','RAMP','S&H','EXP'];
@@ -271,6 +271,10 @@ function chordName(st){
   +(h.has(5)&&(h.has(3)||h.has(4))?(h.has(2)&&(h.has(10)||h.has(11))?',11':'(11'):'')+((h.has(2)||h.has(5)&&(h.has(3)||h.has(4)))&&(h.has(10)||h.has(11))?')':'')+(!h.has(3)&&!h.has(4)?(h.has(5)?'sus4':h.has(2)?'sus2':''):'')+sl;
 }
 const fillChord=(st,root,type,base)=>{st.root=root;st.type=type;st.notes=CT[type][2].map(x=>base+root+x);if(st.voi)revoice(st,st.voi)};
+/* the chord's tones in chord order (root, 3rd, 5th, 6th/7th, 9th, 11th) and the BASS: its n-th tone in octave 2 */
+const TONE_ORDER=[0,4,3,7,6,8,9,10,11,2,1,5];
+const chordTones=c=>{const h=new Set(c.notes.map(n=>((n-c.root)%12+12)%12));return TONE_ORDER.filter(i=>h.has(i)).map(i=>(c.root+i)%12)};
+const bassNote=c=>{const t=chordTones(c);return c.bass&&t.length?36+t[(c.bass-1)%t.length]:0};
 /* voicings: rewrite the step's notes from its pitch classes (what you see is what plays; edit any note after) */
 const VOICINGS=['CLOSE','OPEN','DROP2','SPREAD','VEFF'];
 const VOI_WHY=['all notes inside one octave','every other note an octave up: wider, airier','the second-highest note an octave down: the jazz-piano spread',
@@ -422,14 +426,14 @@ function rows(s){
    [Ls('MAP',o,'map',['KEYS','STEPS']),null,null,null]]}
  case 'PLAY':{
   const r0=[Ls('MODE',p,'mode',PMODES),Ls('STRUM',p,'strum',STRUMS),P('TIME',p,'time',0,127,v=>Math.round(v/127*250)+'ms'),P('HUMAN',p,'hum',0,127)];
-  const steps=P('STEPS',p,'len',1,p.mode===1?16:8);
+  const steps=P('STEPS',p,'len',1,16);
   const rL=[P('VEL',p,'vel',1,127),P('SPRD',p,'sprd',0,127),p.mode===2?null:Ls('RATE',p,'rate',['1/1','1/2','1/4','1/8']),steps];
   if(p.mode===2){const c=p.steps[p.sel];
    const root={l:'ROOT',get:()=>c.root,set:v=>{const d=v-c.root;c.notes=c.notes.map(n=>clamp(n+d,24,96));c.root=v},min:0,max:11,f:v=>NOTES[v]};
    const type={l:'TYPE',get:()=>c.type,set:v=>{const lo=c.notes.length?Math.min(...c.notes):48+c.root;fillChord(c,c.root,v,lo-((lo-c.root)%12+12)%12-c.root)},min:0,max:CT.length-1,f:v=>CT[v][0]};
    const nk=i=>({l:'N'+(i+1),get:()=>c.notes[i]??23,set:v=>{if(v===23){if(i<c.notes.length)c.notes.splice(i,1)}else if(i<c.notes.length)c.notes[i]=v;else c.notes.push(v)},min:23,max:96,f:v=>v===23?'—':noteName(v)});
    const voi={l:'VOICING',get:()=>c.voi||0,set:v=>revoice(c,v),min:0,max:VOICINGS.length-1,f:v=>VOICINGS[v]};
-   const bass={l:'BASS',get:()=>c.bass??23,set:v=>{c.bass=v===23?null:v},min:23,max:60,f:v=>v===23?'—':noteName(v)};
+   const bass={l:'BASS',get:()=>c.bass||0,set:v=>{c.bass=v},min:0,get max(){return chordTones(c).length},f:v=>v?v+' '+NOTES[chordTones(c)[v-1]]:'—'};
    return[r0,[root,type,P('LEN',c,'lenI',0,LENS.length-1,v=>LENN[v]),P('GATE',c,'gate',5,100,v=>v+'%')],[voi,bass,null,null],
     [0,1,2,3].map(nk),[4,5,6,7].map(nk),rL]}
   if(p.mode===1){const c=p.seq[p.sel];return[r0,[P('NOTE',c,'note',24,96,noteName),Ls('ON',c,'on',ONOFF),Ls('SLIDE',c,'slide',ONOFF),P('PROB',c,'prob',0,100,v=>v+'%')],rL]}
@@ -524,7 +528,7 @@ function sel(d){
  const s=snd(),p=s.play;let what='';
  switch(S.page){
   case 'SRC':{const i=clamp(SRCS.indexOf(s.src)+d,0,SRCS.length-1);if(SRCS[i]!==s.src){s.src=SRCS[i];S.row.SRC=0;what='ENGINE '+s.src}break}
-  case 'PLAY':p.sel=clamp(p.sel+d,0,(p.mode===1?16:8)-1);what='STEP '+(p.sel+1);break;
+  case 'PLAY':p.sel=clamp(p.sel+d,0,15);what='STEP '+(p.sel+1);break;
   case 'MOD':s.modSel=clamp(s.modSel+d,0,9);what=modName(s.modSel);break;
   case 'FX':s.fxSel=clamp(s.fxSel+d,0,7);what='SLOT '+(s.fxSel+1)+' '+FX[s.fx[s.fxSel].type][0];break;
   case 'BANK':s.genSel=clamp(s.genSel+d,0,tree(s).length-1);what='G'+tree(s)[s.genSel].g.id;break;
@@ -532,11 +536,22 @@ function sel(d){
  if(what)log('SELECT → '+what,S.page==='SRC'?'On SRC, SELECT picks the engine. In DRUM the keys pick the voice the knobs shape; in OP4 the OP knob (row 3) picks the operator.':'SELECT picks which item on the page the knobs edit.','sel'+S.page);
  render();
 }
+/* SEL on the MOD page's shape rows: a new LFO / envelope shape; with no destination yet, one or two random ones */
+function randMod(s,m){
+ const r=rng((Date.now()^S.dice*7919)>>>0),c=S.chaos/100,mx=(v,lo,hi)=>Math.round(clamp(v+(lo+r()*(hi-lo)-v)*c,lo,hi));
+ if(!S.undo||S.undo.s!==s||S.undo.kind!=='MOD')S.undo={s,kind:'MOD',snap:snapshot(s),t:performance.now()};
+ if(m.kind==='L'){if(r()<c)m.wave=Math.floor(r()*LFOW.length);m.rate=mx(m.rate,0,127);if(r()<c)m.sync=r()<.6?1:0;if(r()<c)m.trig=Math.floor(r()*TRIGS.length);m.phase=mx(m.phase,0,127)}
+ else if(m.kind==='E'){m.atk=mx(m.atk,0,127);m.dec=mx(m.dec,0,127);m.sus=mx(m.sus,0,127);m.rel=mx(m.rel,0,127)}
+ else{m.atk=mx(m.atk,0,127);m.rel=mx(m.rel,0,127);m.gain=mx(m.gain,0,127)}
+ if(!m.routes.some(liveR)){const L=destList(s).filter(x=>x!=='—');for(let k=0,w=1+Math.floor(r()*2);k<4&&w&&L.length;k++)if(!liveR(m.routes[k])){m.routes[k]={dest:L[Math.floor(r()*L.length)],amt:(r()<.5?-1:1)*Math.round((12+r()*40)*(.4+.6*c))};w--}}
+ S.dice++;log(`RANDOM ${modName(s.modSel)} #${S.dice}`,'SEL on the shape row rolls the LFO or envelope (with a destination if it had none). On a destination row (D/A) SEL is LEARN. Hold SEL to undo.','rndMOD');render();
+}
 function selPress(){
  const s=snd();
  if(S.learn){S.learn=null;flash('LEARN OFF');log('LEARN cancelled','SEL turns LEARN off.');render();return}
  if(S.page==='MOD'){
   const m=s.mod[s.modSel],r=curRow(s);let i=m.routes.findIndex(x=>x.dest==='—');
+  if(r!==1&&r!==2){randMod(s,m);return}
   if(i<0&&(r===1||r===2))i=(r-1)*2;
   if(i<0){flash('MAX 4 DESTINATIONS');log('LEARN: no free destination','This source already has 4. Go to a destination row (D/A) and press SEL to overwrite the first of that pair.');render();return}
   S.learn={mod:s.modSel,i};log(`LEARN ${modShort(s.modSel)} → dest ${i+1}`,'Go to any page (EDIT, FX, ARP, another LFO) and turn the knob of the parameter you want to modulate. SEL cancels.');render();return;
@@ -756,7 +771,7 @@ function chordTimeline(s,now){
  return`<svg width="220" height="44">${g}</svg>`;
 }
 function visPlay(s,now){
- const p=s.play;p.sel=clamp(p.sel,0,(p.mode===1?16:8)-1);if(p.mode!==1)p.len=Math.min(p.len,8);
+ const p=s.play;p.sel=clamp(p.sel,0,15);while(p.steps.length<16)p.steps.push({lenI:7,gate:90,root:0,type:0,notes:[]});
  const st=stepNow(s,now);
  if(p.mode===0)return`<div class="empty">PLAY<br>THE KEYS<small>${STRUMS[p.strum]} · VEL ${p.vel}</small></div>`;
  if(p.mode===1)return`<div class="grid g8">${p.seq.map((c,i)=>`<div data-a="seqtog:${i}" class="box${i===p.sel?' sel':''}${i===st?' play':''}${!c.on?' off':''}${i>=p.len?' dim':''}">${c.on?NOTES[c.note%12]:'·'}</div>`).join('')}</div>
@@ -764,7 +779,7 @@ function visPlay(s,now){
  const c=p.steps[p.sel],ns=[...c.notes].sort((a,b)=>a-b);
  return`${chordTimeline(s,now)}
   <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:5px"><span class="t30">${chordName(c)}</span><span class="t14">STEP ${p.sel+1} · ${LENN[c.lenI]} · ${c.gate}%</span></div>
-  <div class="t14" style="margin-top:3px;white-space:nowrap;overflow:hidden">${c.bass!=null?'<b>'+noteName(c.bass)+'</b> | ':''}${ns.length?ns.map(noteName).join(' '):'—'}</div>
+  <div class="t14" style="margin-top:3px;white-space:nowrap;overflow:hidden">${bassNote(c)?'<b>'+noteName(bassNote(c))+'</b> | ':''}${ns.length?ns.map(noteName).join(' '):'—'}</div>
   <div style="margin-top:4px">${strumSvg(p,c.notes,p.sel)}</div>`;
 }
 function lfoVal(w,x){switch(w){case 0:return Math.sin(2*Math.PI*x);case 1:return x<.5?-1+4*x:3-4*x;case 2:return x<.5?1:-1;case 3:return 1-2*x;case 4:return 2*x-1;
