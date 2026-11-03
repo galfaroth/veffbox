@@ -141,7 +141,7 @@ int main(void)
         rows(nm, B_FX);
     }
     btn(B_HOME);
-    RC->print[0] = 2;                                      /* the Firmware Hub card (docs/fmhub.png): RESAMPLE, LEN 2 BAR */
+    RC->print[0] = 2;                                      /* the Firmware Hub card (docs/fmhub2.png): RESAMPLE, LEN 2 BAR */
     shot("card");
     RC->print[0] = 1;
     rows("print", B_HOME);
