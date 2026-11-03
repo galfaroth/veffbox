@@ -47,6 +47,57 @@ def main():
         lp.append(round(32767 * (1 - math.exp(-2 * math.pi * fc / SR))))
     print("static const int16_t VB_ONEPOLE[128] = {\n" + row(lp) + "\n};\n")
 
+    # ---- synth engines (OP4, ANLG) ----
+    # phase increment per sample for MIDI note n (A4 = 69 = 440 Hz), u32 phase
+    ninc = [round(2 ** 32 * 440 * 2 ** ((n - 69) / 12) / SR) for n in range(128)]
+    print("/* VB_NOTE_INC[n]: u32 phase increment of MIDI note n (A4 = 440 Hz) */")
+    print("static const uint32_t VB_NOTE_INC[128] = {\n" + row(ninc, 8) + "\n};\n")
+
+    # synth envelope stage times: t(v) = 1 ms * 10000^(v/127) (1 ms .. 10 s), evaluated every 8 samples.
+    # attack: linear Q30 step per 8 samples to go 0 -> 1 in t. decay / release: Q30 factor per 8 samples, -60 dB in t.
+    times = [0.001 * 10000 ** (v / 127) for v in range(128)]
+    atk = [min(round((1 << 30) * 8 / (t * SR)), 1 << 30) for t in times]
+    k8 = [round((1 << 30) * math.exp(-8 * math.log(1000) / (t * SR))) for t in times]
+    print("/* VB_ENV_ATK8[v]: attack step per 8 samples, Q30; t = 1 ms * 10000^(v/127) */")
+    print("static const int32_t VB_ENV_ATK8[128] = {\n" + row(atk, 8) + "\n};\n")
+    print("/* VB_ENV_K8[v]: decay / release factor per 8 samples, Q30; -60 dB in t = 1 ms * 10000^(v/127) */")
+    print("static const int32_t VB_ENV_K8[128] = {\n" + row(k8, 8) + "\n};\n")
+
+    # OP4 operator waves: single cycles, Q15, 1024 points + guard, peak-normalized. Harmonic sums with
+    # Lanczos sigma factors (no Gibbs ringing), band-limited to 24 harmonics.
+    def additive(amps):
+        K = len(amps)
+        w = [sum(a * (math.sin(math.pi * k / (K + 1)) / (math.pi * k / (K + 1))) * math.sin(2 * math.pi * k * i / 1024)
+                 for k, a in enumerate(amps, 1)) for i in range(1024)]
+        pk = max(abs(x) for x in w)
+        w = [round(32767 * x / pk) for x in w]
+        return w + [w[0]]
+
+    def plain(amps):
+        w = [sum(a * math.sin(2 * math.pi * k * i / 1024) for k, a in enumerate(amps, 1)) for i in range(1024)]
+        pk = max(abs(x) for x in w)
+        w = [round(32767 * x / pk) for x in w]
+        return w + [w[0]]
+
+    H = 24
+    waves = [
+        ("VB_OPW_SIN3", "sin(x) + sin(3x)/3", plain([1, 0, 1 / 3])),
+        ("VB_OPW_SIN5", "sin(x) + sin(3x)/3 + sin(5x)/5", plain([1, 0, 1 / 3, 0, 1 / 5])),
+        ("VB_OPW_SAW", "saw, 24 harmonics", additive([1 / k for k in range(1, H + 1)])),
+        ("VB_OPW_SQR", "square, odd harmonics to 23", additive([(1 / k if k % 2 else 0) for k in range(1, H + 1)])),
+        ("VB_OPW_TRI", "triangle, odd harmonics to 23",
+         additive([((-1) ** ((k - 1) // 2) / (k * k) if k % 2 else 0) for k in range(1, H + 1)])),
+    ]
+    for name, what, w in waves:
+        print(f"/* {name}: {what} */")
+        print(f"static const int16_t {name}[1025] = {{\n" + row(w) + "\n};\n")
+
+    # ANLG osc2 tuning, Q16: DET 0..100 cents, and with SYNC on 0..+24 semitones
+    det = [round(65536 * 2 ** (c / 1200)) for c in range(101)]
+    dsync = [round(65536 * 2 ** (c * 24 / 100 / 12)) for c in range(101)]
+    print("static const int32_t VB_DET_CENTS[101] = {\n" + row(det, 8) + "\n};\n")
+    print("static const int32_t VB_DET_SYNC[101] = {\n" + row(dsync, 8) + "\n};\n")
+
     print("#endif")
 
 

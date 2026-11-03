@@ -110,8 +110,10 @@ static void ed_service(void) {}
 
 /* ---- the application */
 #include "vb/vb_dsp.h"
-#include "vb/vb_drum.c"
-#include "vb/vb_mod.c"
+#include "vb/vb_player.h"           /* the core is compiled as separate objects (tools/fm1_build.sh APP_EXTRA) */
+#include "vb/vb_op4.h"
+#include "vb/vb_anlg.h"
+#include "vb/vb_samp.h"
 #include "vb_app.c"
 
 /* ---- interrupts */
@@ -247,7 +249,7 @@ static void fm1_main(void)
     fm1_guard_lock_top();
     fm1_irq_enable_all();
     fm1_delay_ms(400);
-    vb_ui.force = 1;
+    ui.force = 1;
 
     for (;;) {
         uint32_t m = fm1_ms;
@@ -282,7 +284,7 @@ static void fm1_main(void)
             if (flash_ok)
                 ota_session();                          /* returns only if nothing was committed */
             lcd_fill(0, 0, 240, 240, C_BG);
-            vb_ui.force = 1;
+            ui.force = 1;
         }
         if (usb.uboot_req)
             enter_uboot("UBOOT (USB)");

@@ -1,4 +1,5 @@
-host/test_core
+host/test_*
+!host/test_*.c
 host/out/
 .DS_Store
 build-fm1/

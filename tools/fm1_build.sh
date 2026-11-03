@@ -29,6 +29,15 @@ for a, b in [
     ('worker_errors, worker_notes = check_audio_worker.check(rt, syms)',
      'worker_errors, worker_notes = ([], ["audio worker: none (veffbox)"]) if os.environ.get("APP_ENTRY") '
      'else check_audio_worker.check(rt, syms)'),
+    ("""    elf = OUT / "felucca.elf"
+    extra = []
+""", """    elf = OUT / "felucca.elf"
+    extra = []
+    for src in os.environ.get("APP_EXTRA", "").split():     # veffbox: the core, one object per file
+        obj = OUT / (Path(src).stem + ".o")
+        tc("cc", *flags, "-c", FW / "src" / src, "-o", obj)
+        extra.append(obj)
+"""),
     ("""f'-DFELUCCA_VERSION="{VERSION or drum_version.firmware_string(drum_version.read())}"'""",
      """f'-DFELUCCA_VERSION="{os.environ.get("VB_VERSION") or VERSION or drum_version.firmware_string(drum_version.read())}"'"""),
 ]:
@@ -40,7 +49,28 @@ for a, b in [
         sys.exit("fm1_build: build.py changed, patch not applied: " + a[:60])
 open(p, "w").write(t)
 PY
+# veffbox's own identity and USB name (must contain "FM-1": the installers look for it)
+python3 - "$T" <<'PY2'
+import re, sys
+root = sys.argv[1]
+v = root + "/tools/version.py"
+t = open(v).read()
+t2 = re.sub(r'^PRODUCT = "FM-1_\d+"', 'PRODUCT = "FM-1_62000100"', t, count=1, flags=re.M)
+if t2 == t:
+    sys.exit("fm1_build: tools/version.py PRODUCT not found")
+open(v, "w").write(t2)
+u = root + "/firmware/src/usb_app.c"
+t = open(u).read()
+name = "FM-1 VEFFBOX"
+arr = ", ".join(f"'{c}', 0" for c in name)
+t2 = re.sub(r"static const uint8_t STR2\[\] = \{22, 3, 'F', 0, 'M', 0, '-', 0, '1', 0, ' ', 0, 'M', 0, 'N', 0, 'M', 0, '-', 0, '1', 0\};",
+            "static const uint8_t STR2[] = {%d, 3, %s};" % (2 + 2 * len(name), arr), t, count=1)
+if t2 == t:
+    sys.exit("fm1_build: usb_app.c STR2 not found")
+open(u, "w").write(t2)
+PY2
+EXTRA="$(cd "$T/firmware/src" && ls vb/*.c | tr '\n' ' ')"
 cd "$T"
-APP_ENTRY=veffbox.c FELUCCA_DUAL_CORE=0 DRUM_PACKAGE=1 DRUM_SITE=0 VB_VERSION="VEFFBOX $VER" python3 tools/build.py
+APP_EXTRA="$EXTRA" APP_ENTRY=veffbox.c FELUCCA_DUAL_CORE=0 DRUM_PACKAGE=1 DRUM_SITE=0 VB_VERSION="VEFFBOX $VER" python3 tools/build.py
 cp build/felucca-UNTESTED.fwsc "$VB/dist/veffbox-$VER.fwsc"
 echo "veffbox package: $VB/dist/veffbox-$VER.fwsc"
