@@ -35,7 +35,7 @@ static volatile uint32_t fm1_ms;     /* milliseconds since boot (TIMER5 ISR) */
 struct { uint32_t magic, failed, pending; } bootguard __attribute__((section(".noinit")));
 
 /* the audio ISR's diagnostics (TIMER5 nests into the render; see fm1_timer5_irq) */
-static struct { uint32_t in_audio, nested, halves, late, max_us, last_us, timer_irqs; } vb_dbg;
+static struct { uint32_t in_audio, nested, halves, late, max_us, last_us, timer_irqs, cpu_q8, cpu_rem; } vb_dbg;
 static volatile uint32_t t5_nested_ticks;
 
 #include "enc.c"
@@ -67,6 +67,24 @@ static void audio_silence(void)
     uint32_t i;
     for (i = 0; i < sizeof abuf / sizeof abuf[0]; i++)
         abuf[i] = 0;
+}
+static int st_erase(uint32_t off)                   /* IRQs off: the DMA would loop stale audio, so silence first */
+{
+    uint32_t took, f;
+    int rc;
+    if (!FL_STORE_OK(off, 0x1000u))
+        return -8;
+    f = irq_save();
+    audio_silence();
+    rc = FL_FAR(fl_erase4k_ram)(off, &took);
+    irq_restore(f);
+    return rc;
+}
+static int st_prog(uint32_t off, const void *src, uint32_t n)
+{
+    if (!FL_STORE_OK(off, n))
+        return -8;
+    return fl_write(off, src, n);
 }
 #include "ota.c"
 static uint32_t ota_now_ms(void) { return fm1_ms; }
@@ -106,7 +124,8 @@ static void ota_commit(const uint8_t *parm)
     fm1_delay_ms(30);
     fm1_enter_update(parm);
 }
-static void ed_service(void) {}
+static void vb_remote(void);                    /* vb_app.c: SysEx remote control and diagnostics */
+static void ed_service(void) { vb_remote(); }
 
 /* ---- the application */
 #include "vb/vb_dsp.h"
@@ -114,6 +133,9 @@ static void ed_service(void) {}
 #include "vb/vb_op4.h"
 #include "vb/vb_anlg.h"
 #include "vb/vb_samp.h"
+#include "vb/vb_gran.h"
+#include "vb/vb_chop.h"
+#include "vb/vb_store.h"
 #include "vb_app.c"
 
 /* ---- interrupts */
@@ -168,13 +190,19 @@ void fm1_alnk0_irq(void)
         for (b = 0; b < HALF_FRAMES; b += CTL) {
             int32_t *out = o + 2u * b;
             vb_audio_block(out, CTL);
-            uac_tap(out, CTL);
+            uac_tap(out, CTL);                      /* USB audio: always at full level (record it in a DAW) */
+            vb_master(out, CTL);
             for (i = 0; i < 2u * CTL; i++)
                 out[i] *= 1 << OUT_SHIFT;
         }
         fm1_audio_ack_half();
         us = (fm1_ticks() - t0 - t5_nested_ticks) / FM1_TICKS_PER_US;
         vb_dbg.last_us = us;
+        {   /* the average load, % x 256 of the half's time (an IIR that keeps its remainder) */
+            uint32_t load = vb_dbg.cpu_q8 * 15u + us * 25600u / 5805u + vb_dbg.cpu_rem;
+            vb_dbg.cpu_q8 = load / 16u;
+            vb_dbg.cpu_rem = load % 16u;
+        }
         if (us > vb_dbg.max_us)
             vb_dbg.max_us = us;
         if (fm1_audio_free_half() != half)

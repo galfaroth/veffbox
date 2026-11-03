@@ -8,7 +8,19 @@ as notes, a sequence or a strummed chord sequence, modulate anything with 6 LFOs
 Every print keeps its recipe, so each of the 64 bank sounds has a generation tree you can branch
 from or rebuild bit-exactly.
 
-**Status:** early. The interface is a clickable mockup; the firmware core is being built.
+**Status:** firmware 0.2.0 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
+chord sequences, modulation, the FX chain, PRINT, the 64-sound bank with generations in flash, and bit-exact REBUILD.
+Not yet: four tracks sounding at once, PITCH as a modulation target, prints longer than 1.67 s.
+
+## Build, install, test on the hardware
+
+```
+tools/fm1_build.sh ../mnm-1.0.1                        # on the Linux x86-64 host with the JieLi toolchain
+python3 ../tools/fm1_install.py dist/veffbox-X.Y.Z.fwsc --port FM-1 --yes   # MNM-1's installer
+python3 tools/fm1_remote.py stats                       # CPU load, late buffers, the app's state
+python3 tools/fm1_remote.py press PLAY                  # buttons, encoders and keys over USB SysEx
+```
+USB audio is the output at full level, independent of MASTER. USB MIDI notes play the sound.
 
 ## Try the interface
 

@@ -18,6 +18,11 @@ void vb_samp_set_buffer(const int16_t *buf, uint32_t len)
     sbuf = buf;
     slen = len > 65535u ? 65535u : len;
 }
+const int16_t *vb_samp_buffer(uint32_t *len)
+{
+    *len = sbuf ? slen : 0u;
+    return sbuf;
+}
 
 /* 2^(k/12), Q16 */
 static const uint32_t SEMI_Q16[12] = {65536, 69433, 73562, 77936, 82570, 87480, 92682, 98193, 104032, 110218, 116772, 123715};

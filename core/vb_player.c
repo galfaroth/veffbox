@@ -4,6 +4,8 @@
 #include "vb_op4.h"
 #include "vb_anlg.h"
 #include "vb_samp.h"
+#include "vb_gran.h"
+#include "vb_chop.h"
 
 enum { C_NOTE_ON = 1, C_NOTE_OFF, C_PLAY, C_STOP, C_PRINT, C_PANIC, C_SWAP };
 #define CMD(t, a, b) ((uint32_t)(t) << 24 | (uint32_t)((a) & 0xFF) << 16 | (uint32_t)((b) & 0xFF) << 8)
@@ -21,7 +23,9 @@ static const vb_engine_t *engine_of(int src)
     case VB_SRC_OP4: return &vb_op4;
     case VB_SRC_ANLG: return &vb_anlg;
     case VB_SRC_DRUM: return 0;
-    default: return &vb_samp;                /* SAMP; GRAN and CHOP play the print as SAMP for now */
+    case VB_SRC_GRAN: return &vb_gran;
+    case VB_SRC_CHOP: return &vb_chop;
+    default: return &vb_samp;
     }
 }
 
@@ -350,7 +354,15 @@ static void route_add(vb_player_t *p, vb_addr_t a, int32_t d)
             d_src[i] += d;
         break;
     case VB_D_SAMP:
-        if (p->eng_src >= VB_SRC_SAMP && i < VB_SAMP_NP)
+        if (p->eng_src == VB_SRC_SAMP && i < VB_SAMP_NP)
+            d_src[i] += d;
+        break;
+    case VB_D_GRAN:
+        if (p->eng_src == VB_SRC_GRAN && i < VB_GRAN_NP)
+            d_src[i] += d;
+        break;
+    case VB_D_CHOP:
+        if (p->eng_src == VB_SRC_CHOP && i < VB_CHOP_NP)
             d_src[i] += d;
         break;
     case VB_D_DRUM:
@@ -414,7 +426,8 @@ static void mod_block(vb_player_t *p, int n)
         p->d_mod[i] = d_mod_new[i];
     /* the effective patches */
     if (p->eng) {
-        const uint8_t *base = p->eng_src == VB_SRC_OP4 ? rc->op4 : p->eng_src == VB_SRC_ANLG ? rc->anlg : rc->samp;
+        const uint8_t *base = p->eng_src == VB_SRC_OP4 ? rc->op4 : p->eng_src == VB_SRC_ANLG ? rc->anlg :
+                              p->eng_src == VB_SRC_GRAN ? rc->gran : p->eng_src == VB_SRC_CHOP ? rc->chop : rc->samp;
         pd = p->eng->desc.params;
         np = p->eng->desc.nparams;
         for (i = 0; i < (uint32_t)np && i < 48u; i++)
@@ -440,15 +453,61 @@ static void mod_block(vb_player_t *p, int n)
 }
 
 /* ---- PRINT */
+/* the canonical state a print starts from, so REBUILD reproduces it exactly: voices, LFOs, envelopes, FX (buffers
+ * cleared), transport, events and randomness all restart from the recipe's seed and tempo */
+static void canonical(vb_player_t *p)
+{
+    uint32_t i;
+    vb_recipe_t *rc = p->rc;
+    p->bpm10 = rc->bpm10 ? rc->bpm10 : p->bpm10;
+    tempo(p);
+    p->nev = 0;
+    p->playing = 0;
+    p->rng = rc->seed ? rc->seed : 1u;
+    p->agec = 0;
+    p->last_note = rc->pnote;
+    for (i = 0; i < VB_POLY; i++)
+        p->vage[i] = 0;
+    voices_reset(p);
+    for (i = 0; i < 6; i++) {
+        uint8_t ph = rc->mod[i].phase;
+        p->lfo[i].phase = ph;
+        vb_lfo_init(&p->lfo[i], rc->seed + 77u * (i + 1u));
+    }
+    for (i = 0; i < 3; i++) {
+        p->env[i] = 0;
+        p->env_stage[i] = 0;
+    }
+    for (i = 0; i < VB_MODSRC * 8u; i++)
+        p->d_mod[i] = 0;
+    for (i = 0; i < VB_FX_SLOTS; i++) {
+        int16_t *b = p->fx[i].buf;
+        uint32_t k;
+        for (k = 0; k < VB_FX_BUF; k++)
+            b[k] = 0;
+        vb_fx_init(&p->fx[i], b, rc->seed + 1013u * (i + 1u));
+    }
+    mod_block(p, 32);                         /* the effective patches for the first notes */
+}
+
 static void print_begin(vb_player_t *p)
 {
-    uint32_t s16 = p->tick_q8 >> 8, len = p->rc->print[0];
+    uint32_t s16, len = p->rc->print[0];
+    if (p->eng_src != p->rc->src) {
+        p->eng_src = p->rc->src;
+        p->eng = engine_of(p->rc->src);
+    }
+    p->rc->bpm10 = (uint16_t)p->bpm10;        /* the recipe remembers the tempo and the note it printed at */
+    if (len == 0)
+        p->rc->pnote = p->last_note ? p->last_note : 60;
+    canonical(p);
+    s16 = p->tick_q8 >> 8;
     p->rec = 1;
     p->rec_pos = 0;
     p->rec_done = 0;
     p->rec_quiet = 0;
     if (len == 0) {                          /* NOTE: one note and its tail, until silence */
-        int note = p->last_note ? p->last_note : 60;
+        int note = p->rc->pnote;
         p->rec_target = p->pcap;
         p->rec_started_play = 0;
         voice_on(p, note, p->rc->play.vel);
@@ -459,7 +518,6 @@ static void print_begin(vb_player_t *p)
         p->rec_target = want < p->pcap ? want : p->pcap;
         p->rec_started_play = 1;
         p->rec_note_off = 0;
-        all_off(p);
         transport_start(p);
     }
 }
@@ -514,6 +572,27 @@ int vb_player_print_take(vb_player_t *p)
     return 1;
 }
 
+uint32_t vb_player_print_offline(vb_player_t *p)
+{
+    int32_t tmp[32];
+    uint32_t guard = 0;
+    cmd_push(p, CMD(C_PRINT, 0, 0));          /* the same path as a live print: the same bits */
+    do {
+        vb_player_render(p, tmp, 32);
+        if (p->idle && (guard & 255u) == 0u)
+            p->idle();
+    } while (!p->rec_done && guard++ < 200000u);
+    vb_player_print_take(p);
+    vb_player_render(p, tmp, 32);             /* applies the swap */
+    return p->plen[p->cur];
+}
+
+void vb_player_load(vb_player_t *p, uint32_t len)
+{
+    p->plen[p->cur ^ 1u] = len > p->pcap ? p->pcap : len;
+    cmd_push(p, CMD(C_SWAP, 0, 0));
+}
+
 /* ---- the block */
 static void commands(vb_player_t *p)
 {
@@ -522,7 +601,10 @@ static void commands(vb_player_t *p)
         int a = (int)((c >> 16) & 0xFFu), b = (int)((c >> 8) & 0xFFu);
         p->cmd_r++;
         switch (c >> 24) {
-        case C_NOTE_ON: voice_on(p, a, b); break;
+        case C_NOTE_ON:
+            if (!p->rec)                     /* keys don't play into a print: REBUILD must reproduce it */
+                voice_on(p, a, b);
+            break;
         case C_NOTE_OFF: voice_off(p, a); break;
         case C_PLAY: transport_start(p); break;
         case C_STOP:
@@ -542,7 +624,7 @@ static void commands(vb_player_t *p)
         case C_SWAP:
             p->cur ^= 1u;
             vb_samp_set_buffer(p->pbuf[p->cur], p->plen[p->cur]);
-            if (p->eng == &vb_samp)
+            if (p->eng == &vb_samp || p->eng == &vb_gran || p->eng == &vb_chop)
                 voices_reset(p);
             break;
         }

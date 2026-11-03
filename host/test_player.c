@@ -104,6 +104,22 @@ int main(void)
     CHECK(pk > 1000, "SAMP plays the print (peak %d)", pk);
     wav("host/out/player_samp.wav", out, VB_SR / 32 * 32);
     printf("print: %u samples at 22.05 kHz, SAMP peak %d\n", P.plen[P.cur], pk);
+    R.src = VB_SRC_GRAN;
+    vb_player_note(&P, 60, 110, 1);
+    pk = run(1.0);
+    CHECK(pk > 500, "GRAN plays the print (peak %d)", pk);
+    wav("host/out/player_gran.wav", out, VB_SR / 32 * 32);
+    R.src = VB_SRC_CHOP;
+    for (k = 0; k < 4; k++) {
+        vb_player_note(&P, 60 + k, 110, 1);
+        run(0.2);
+        vb_player_note(&P, 60 + k, 0, 0);
+    }
+    pk = run(0.5);
+    vb_player_note(&P, 61, 110, 1);
+    pk = run(0.3);
+    CHECK(pk > 500, "CHOP plays slices (peak %d)", pk);
+    printf("GRAN and CHOP play the print\n");
 
     /* 5. an LFO on ANLG's cutoff changes the sound */
     vb_recipe_default(&R, 5);
@@ -166,6 +182,34 @@ int main(void)
         CHECK(n > 40, "addr list %d", n);
         vb_chord_name(&R.play.chord[0], b, sizeof b);
         CHECK(strcmp(b, "Cm7") == 0, "chord name %s", b);
+    }
+    /* 8. REBUILD: a print made live (after playing around) equals the same recipe printed offline from scratch */
+    {
+        static int16_t live[36864];
+        uint32_t len_live, len_off;
+        vb_recipe_default(&R, 77);
+        R.src = VB_SRC_ANLG;
+        R.fx[0].type = VB_FX_TAPE;
+        R.fx[1].type = VB_FX_REVERB;
+        R.mod[0].r[0].dest = VB_ADDR(VB_D_ANLG, 8);
+        R.mod[0].r[0].amt = 40;
+        vb_player_init(&P, &R, fxbuf, pa, pb, 36864);
+        vb_player_play(&P, 1);
+        run(1.3);                                          /* live state: tails, LFO phase, events */
+        vb_player_note(&P, 50, 100, 1);
+        run(0.2);
+        vb_player_print(&P);
+        for (i = 0; i < 600 && !P.rec_done; i++)
+            run(0.01);
+        CHECK(vb_player_print_take(&P) == 1, "live print");
+        run(0.01);
+        len_live = P.plen[P.cur];
+        memcpy(live, P.pbuf[P.cur], len_live * 2);
+        vb_player_init(&P, &R, fxbuf, pa, pb, 36864);          /* a fresh player, the stored recipe */
+        len_off = vb_player_print_offline(&P);
+        CHECK(len_live == len_off && len_off > 1000, "rebuild length %u vs live %u", len_off, len_live);
+        CHECK(memcmp(live, P.pbuf[P.cur], len_off * 2) == 0, "rebuild differs from the live print");
+        printf("rebuild: %u samples, bit-exact %s\n", len_off, memcmp(live, P.pbuf[P.cur], len_off * 2) ? "NO" : "yes");
     }
     printf(failures ? "\n%d FAILED\n" : "\nall player tests passed\n", failures);
     return failures != 0;

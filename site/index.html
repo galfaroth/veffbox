@@ -818,30 +818,33 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     <div class="s-head">
       <span class="num">10 · Status</span>
       <h2 id="status-title">Early, and honest about it.</h2>
-      <p class="lead">The interface above is a complete clickable mockup without sound. The firmware is being built engine
-        by engine, in portable integer C that is tested on a computer before it reaches the FM&#8209;1.</p>
+      <p class="lead">The interface above is a clickable mockup without sound. The firmware runs on the FM&#8209;1
+        today: every page of the mockup, built in portable integer C that is tested on a computer before it reaches
+        the hardware.</p>
     </div>
     <div class="status-grid">
       <div class="card now-card">
-        <span class="tag">Test build 0.0.1</span>
+        <span class="tag">Firmware 0.2.0</span>
         <h3 style="margin-top:16px">Running on hardware today</h3>
-        <p>Test builds run on a real FM&#8209;1, on MNM-1's proven platform. The current one plays the DRUM engine.</p>
+        <p>Measured on a real FM&#8209;1: a strummed OP4 chord sequence through a scrambled FX chain peaks at 45% CPU,
+          with no late audio buffers.</p>
         <ul>
-          <li><b>KEYS</b>play the 8 drum voices and select the one to shape</li>
-          <li><b>KNOB 1–4</b>the lit row of the voice's parameters</li>
-          <li><b>SEL</b>RANDOMIZE the voice; hold 0.6 s to undo</li>
-          <li><b>PLAY</b>a 16-step test beat at 120 BPM</li>
-          <li><b>OCT− + OCT+</b>held 5 s: UBOOT</li>
+          <li><b>Sources</b>OP4, ANLG, DRUM, and SAMP, GRAN and CHOP playing the print</li>
+          <li><b>Play</b>keys, a 16-step line, or a chord sequence with exact notes and seven strums</li>
+          <li><b>MOD</b>6 LFOs and 3 envelopes, 4 destinations each, LEARN</li>
+          <li><b>FX</b>8 slots, 13 types, SCRAMBLE; hold SEL to undo</li>
+          <li><b>PRINT</b>the print becomes the source; generations are saved to flash</li>
+          <li><b>REBUILD</b>re-renders a generation from its recipe, bit-exact</li>
         </ul>
       </div>
       <ol class="miles">
         <li><span class="m">M0</span><span class="t">Mockup <span class="tag ok">done</span></span><span class="d">Every page, every button, the bank tree. The panel at the top of this page.</span></li>
-        <li><span class="m">M1</span><span class="t">Portable core <span class="tag soft">in progress</span></span><span class="d">DRUM (8 voices), LFOs and routing, host tests for repeatability and overflow. Next: OP4, ANLG, the FX slots, envelopes, the recipe codec.</span></li>
-        <li><span class="m">M2</span><span class="t">Platform <span class="tag ok">first image</span></span><span class="d">MNM-1's hardware layer, loader and tools. DRUM on the keys.</span></li>
-        <li><span class="m">M3</span><span class="t">UI on the device</span><span class="d">Pages, rows, SELECT and SEL, RANDOMIZE and SCRAMBLE with undo, LEARN.</span></li>
-        <li><span class="m">M4</span><span class="t">PRINT</span><span class="d">Render the chain into RAM; SAMP, GRAN and CHOP play it.</span></li>
-        <li><span class="m">M5</span><span class="t">Bank</span><span class="d">Recipes as deltas in flash, the generation tree, LOAD, EDIT, REBUILD.</span></li>
-        <li><span class="m">M6</span><span class="t">In the browser</span><span class="d">The same C core built for the web, so this mockup plays the real sound.</span></li>
+        <li><span class="m">M1</span><span class="t">Portable core <span class="tag ok">done</span></span><span class="d">Six engines, 13 effects, modulation, the player, flash formats. Host tests for repeatability and overflow.</span></li>
+        <li><span class="m">M2</span><span class="t">Platform <span class="tag ok">done</span></span><span class="d">MNM-1's hardware layer, loader and tools; its own identity, FM-1_62000100.</span></li>
+        <li><span class="m">M3</span><span class="t">UI on the device <span class="tag ok">done</span></span><span class="d">Pages, rows, SELECT and SEL, RANDOMIZE and SCRAMBLE with undo, LEARN.</span></li>
+        <li><span class="m">M4</span><span class="t">PRINT <span class="tag ok">done</span></span><span class="d">The chain renders into RAM (1.67 s); SAMP, GRAN and CHOP play it.</span></li>
+        <li><span class="m">M5</span><span class="t">Bank <span class="tag ok">done</span></span><span class="d">64 sounds and their generations in flash, LOAD, EDIT, REBUILD.</span></li>
+        <li><span class="m">M6</span><span class="t">Next</span><span class="d">Four tracks sounding at once, PITCH as a modulation target, longer prints, and the core in the browser so this page plays the real sound.</span></li>
       </ol>
     </div>
   </div>

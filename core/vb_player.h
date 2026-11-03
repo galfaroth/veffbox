@@ -57,6 +57,7 @@ typedef struct {
     int32_t rec_pair;
     int32_t peak;                        /* output peak since the UI last read it */
     int32_t block[32];
+    void (*idle)(void);                  /* called during long offline renders (the watchdog) */
 } vb_player_t;
 
 void vb_player_init(vb_player_t *p, vb_recipe_t *rc, int16_t *fxbuf /* VB_FX_SLOTS * VB_FX_BUF */,
@@ -68,6 +69,11 @@ void vb_player_print(vb_player_t *p);
 void vb_player_panic(vb_player_t *p);
 /* the print is finished (call from the UI): normalizes if asked, makes it the SAMP source; returns 1 once */
 int vb_player_print_take(vb_player_t *p);
+/* PRINT without the audio thread (REBUILD): resets to the canonical state, records the recipe's print into the
+ * free buffer, swaps it in; returns the print's length. A live print renders the same bits. */
+uint32_t vb_player_print_offline(vb_player_t *p);
+/* a print loaded from storage: the caller filled pbuf[cur ^ 1] with len samples; it becomes the SAMP source */
+void vb_player_load(vb_player_t *p, uint32_t len);
 /* audio side: n <= 32 mono Q15 samples */
 void vb_player_render(vb_player_t *p, int32_t *out, int n);
 

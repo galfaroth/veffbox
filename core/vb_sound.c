@@ -3,6 +3,8 @@
 #include "vb_op4.h"
 #include "vb_anlg.h"
 #include "vb_samp.h"
+#include "vb_gran.h"
+#include "vb_chop.h"
 
 const char *const vb_src_name[VB_SRCS] = {"OP4", "ANLG", "DRUM", "SAMP", "GRAN", "CHOP"};
 const char *const vb_strum_name[VB_STRUMS] = {"UP", "DOWN", "ALT", "RND", "HARP", "LUSH", "ARP"};
@@ -117,6 +119,10 @@ void vb_recipe_default(vb_recipe_t *r, uint32_t seed)
     vb_drum_patch_default(&r->drum);
     for (i = 0; i < VB_SAMP_NP; i++)
         r->samp[i] = SAMP_DEF[i];
+    for (i = 0; i < VB_GRAN_NP; i++)
+        r->gran[i] = vb_gran.desc.params[i].def;
+    for (i = 0; i < VB_CHOP_NP; i++)
+        r->chop[i] = vb_chop.desc.params[i].def;
     r->play.mode = VB_PLAY_CHORD;
     r->play.strum = VB_STRUM_UP;
     r->play.time = 30;
@@ -157,6 +163,8 @@ void vb_recipe_default(vb_recipe_t *r, uint32_t seed)
     }
     r->print[0] = 1;                                 /* LEN 1 BAR */
     r->print[2] = 1;                                 /* NORM on */
+    r->pnote = 60;
+    r->bpm10 = 1200;
     r->seed = seed;
 }
 
@@ -171,6 +179,8 @@ static uint8_t *addr_ptr(vb_recipe_t *r, vb_addr_t a)
             return 0;
         return i % 9 == 8 ? &r->drum.lvl[i / 9] : &r->drum.p[i / 9][i % 9];
     case VB_D_SAMP: return i < VB_SAMP_NP ? &r->samp[i] : 0;
+    case VB_D_GRAN: return i < VB_GRAN_NP ? &r->gran[i] : 0;
+    case VB_D_CHOP: return i < VB_CHOP_NP ? &r->chop[i] : 0;
     case VB_D_FX:
         if (i / 5 >= VB_FX_SLOTS)
             return 0;
@@ -243,6 +253,12 @@ void vb_addr_name(const vb_recipe_t *r, vb_addr_t a, char *out, int max)
     case VB_D_SAMP:
         vb_cat(out, vb_cat(out, 0, "SM ", max), SAMP_LABEL[i], max);
         return;
+    case VB_D_GRAN:
+        vb_cat(out, vb_cat(out, 0, "GR ", max), vb_gran.desc.params[i].label, max);
+        return;
+    case VB_D_CHOP:
+        vb_cat(out, vb_cat(out, 0, "CH ", max), vb_chop.desc.params[i].label, max);
+        return;
     case VB_D_FX:
         at = vb_cat(out, 0, "FX", max);
         at = vb_catnum(out, at, i / 5 + 1, max);
@@ -284,6 +300,16 @@ int vb_addr_list(const vb_recipe_t *r, vb_addr_t *out, int max)
     case VB_SRC_DRUM:
         for (i = 0; i < VB_DRUM_VOICES * 9; i++)
             ADD(VB_ADDR(VB_D_DRUM, i));
+        break;
+    case VB_SRC_GRAN:
+        for (i = 0; i < VB_GRAN_NP; i++)
+            if (vb_gran.desc.params[i].flags & VB_P_MOD)
+                ADD(VB_ADDR(VB_D_GRAN, i));
+        break;
+    case VB_SRC_CHOP:
+        for (i = 0; i < VB_CHOP_NP; i++)
+            if (vb_chop.desc.params[i].flags & VB_P_MOD)
+                ADD(VB_ADDR(VB_D_CHOP, i));
         break;
     default:
         for (i = 0; i < VB_SAMP_NP; i++)

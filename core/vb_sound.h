@@ -16,6 +16,8 @@ extern const char *const vb_src_name[VB_SRCS];
 
 #define VB_OP4_NP 38
 #define VB_ANLG_NP 16
+#define VB_GRAN_NP 11                     /* POS SIZE DENS SPRAY PITCH PRND REV WIN FRZ WIDTH SEED */
+#define VB_CHOP_NP 9                      /* SENS SLICE PITCH REV ORDER LEN ATK DEC MAP */
 #define VB_SAMP_NP 8                      /* START LEN LOOP REV PITCH FINE FADE GAIN */
 #define VB_CHORD_STEPS 8
 #define VB_CHORD_NOTES 6
@@ -51,10 +53,14 @@ typedef struct {
     uint8_t anlg[VB_ANLG_NP];
     vb_drum_patch_t drum;
     uint8_t samp[VB_SAMP_NP];
+    uint8_t gran[VB_GRAN_NP];
+    uint8_t chop[VB_CHOP_NP];
     vb_play_t play;
     vb_modsrc_t mod[VB_MODSRC];
     vb_fx_slot_t fx[VB_FX_SLOTS];
     uint8_t print[VB_PRINT_NP];
+    uint8_t pnote;                        /* the note a NOTE print plays (the last key) */
+    uint16_t bpm10;                       /* the tempo at the print: a REBUILD renders at it */
     uint32_t seed;
 } vb_recipe_t;
 
@@ -68,6 +74,8 @@ enum {
     VB_D_MOD,          /* source * 8 + i: LFO RATE PHASE / ENV ATK DEC SUS REL (see vb_addr_name) */
     VB_D_PLAY,         /* 0 TIME 1 HUMAN 2 VEL 3 SPRD */
     VB_D_GLOBAL,       /* 0 PITCH (+-24 semitones around 64) 1 VOL */
+    VB_D_GRAN,         /* 0..10 */
+    VB_D_CHOP,         /* 0..8 */
 };
 typedef uint16_t vb_addr_t;
 #define VB_ADDR(d, i) ((vb_addr_t)((d) << 8 | (i)))

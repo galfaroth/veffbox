@@ -9,5 +9,7 @@
 extern const vb_engine_t vb_samp;
 /* the print the sampler plays (all SAMP voices share it); len in samples, at most 65535 */
 void vb_samp_set_buffer(const int16_t *buf, uint32_t len);
+/* the print the sampler plays (GRAN and CHOP read it too): its samples and length */
+const int16_t *vb_samp_buffer(uint32_t *len);
 
 #endif
