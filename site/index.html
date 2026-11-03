@@ -6,15 +6,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>veffbox: resampling sound design for the M-VAVE FM-1</title>
-<meta name="description" content="veffbox is open-source firmware for the M-VAVE FM-1. Build one sound from a source, a strummed chord sequence, 9 modulators and an 8-slot FX chain, then PRINT it: the print becomes the next sound, and its recipe rebuilds it bit for bit.">
+<meta name="description" content="veffbox is open-source firmware for the M-VAVE FM-1. Build one sound from a source, a strummed chord sequence, 9 modulators and an 8-slot FX chain, then RESAMPLE it: the resample becomes the next sound, and its recipe rebuilds it bit for bit.">
 <meta name="theme-color" content="#f4d9ea">
 <meta name="color-scheme" content="light">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="veffbox">
-<meta property="og:title" content="veffbox: one sound. Print it. Make it the next sound.">
-<meta property="og:description" content="Resampling sound-design firmware for the M-VAVE FM-1: six sources, strummed chords, 9 modulators, an 8-slot FX chain, and a generation tree that rebuilds every print bit-exactly.">
+<meta property="og:title" content="veffbox: one sound. Resample it. Make it the next sound.">
+<meta property="og:description" content="Resampling sound-design firmware for the M-VAVE FM-1: six sources, strummed chords, 9 modulators, an 8-slot FX chain, and a generation tree that rebuilds every resample bit-exactly.">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="veffbox: one sound. Print it. Make it the next sound.">
+<meta name="twitter:title" content="veffbox: one sound. Resample it. Make it the next sound.">
 <meta name="twitter:description" content="Resampling sound-design firmware for the M-VAVE FM-1. Open source, GPL-3.0.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23f4d9ea'/%3E%3Ccircle cx='32' cy='32' r='19' fill='%231d0819'/%3E%3Crect x='29' y='15' width='6' height='15' rx='3' fill='%23e07fb5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -78,6 +78,7 @@ p+p{margin-top:.8em}
 .hero::before{content:'';position:absolute;inset:-64px 0 auto 0;height:720px;background:radial-gradient(60% 70% at 85% 10%,#e07fb540,transparent 70%),radial-gradient(40% 50% at 0% 40%,#f4d9ea,transparent 70%);z-index:-1;pointer-events:none}
 .hero .kicker{margin-bottom:22px}
 .hero h1{max-width:12ch}
+.hero h1.cycle{max-width:18ch;font-size:clamp(38px,7.2vw,92px)}
 .hero .lead{margin-top:28px}
 .ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
 .btn{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 24px;border-radius:999px;background:var(--ink);color:var(--bg);font-weight:700;font-size:17px;text-decoration:none;border:0;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 #000}
@@ -125,6 +126,18 @@ section.s{padding:96px 0 24px}
 .loop-h{display:none}
 @media (min-width:720px){.loop-h{display:block}.loop-v{display:none}}
 .loop-v{max-width:400px;margin:0 auto}
+.cycle i{font-style:normal;color:var(--accent);font-weight:400}
+.cycle .loop-mark{display:inline-block;margin-left:.2em;color:var(--accent)}
+.guide{list-style:none;counter-reset:g;display:grid;gap:14px;margin-top:40px}
+.guide>li{counter-increment:g;display:grid;grid-template-columns:56px 1fr;gap:6px 18px;background:var(--surface);border-radius:22px;padding:22px}
+.guide>li::before{content:counter(g);grid-row:span 4;width:48px;height:48px;border-radius:50%;background:var(--ink);color:var(--accent);
+  display:grid;place-items:center;font-weight:700;font-size:22px}
+.guide>li>*{grid-column:2}
+.guide h3{font-size:22px;letter-spacing:-.03em;margin:0}
+.guide .do{font-family:var(--mono);font-size:13px;color:var(--accent-ink);letter-spacing:.03em}
+.guide p{font-size:16px;line-height:1.5;color:var(--ink-2);margin:0}
+.guide .tip{font-size:14.5px;background:var(--bg);border-radius:14px;padding:10px 14px}
+@media (max-width:560px){.guide>li{grid-template-columns:1fr}.guide>li::before{grid-row:auto}.guide>li>*{grid-column:1}}
 .steps{display:grid;gap:12px;margin-top:40px;list-style:none;counter-reset:st}
 @media (min-width:720px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (min-width:1100px){.steps{grid-template-columns:repeat(5,minmax(0,1fr))}}
@@ -332,9 +345,10 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
   <div class="wrap">
     <a class="mark" href="#top" aria-label="veffbox, top of the page"><i aria-hidden="true"></i>veffbox</a>
     <nav aria-label="Sections">
+      <a href="#guide">Start</a>
       <a class="hide-s" href="#loop">Loop</a>
       <a class="hide-s" href="#sources">Sound</a>
-      <a class="hide-s" href="#print">Print</a>
+      <a class="hide-s" href="#print">Resample</a>
       <a class="hide-s" href="#panel">Panel</a>
       <a href="#install">Install</a>
       <a href="https://github.com/galfaroth/veffbox">GitHub</a>
@@ -346,16 +360,18 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
 <section class="hero">
   <div class="wrap">
     <p class="kicker">Firmware for the M-VAVE FM&#8209;1 · open source · early</p>
-    <h1>One sound. <span class="hl">Print&nbsp;it.</span> Make it the next sound.</h1>
+    <h1 class="cycle">Make a sound <i aria-hidden="true">›</i> <span class="hl">resample</span> <i aria-hidden="true">›</i>
+      make it something new <i aria-hidden="true">›</i> <span class="hl">resample</span> <i aria-hidden="true">›</i>
+      <span style="white-space:nowrap">repeat forever<span class="loop-mark" aria-hidden="true">↻</span></span></h1>
     <p class="lead">veffbox is a resampling sound-design instrument for a 27-key pocket synth. Build <b>one sound</b> from a
-      source, a strummed chord sequence, modulation and up to eight effects. Then <b>PRINT</b>: the recording becomes the
+      source, a strummed chord sequence, modulation and up to eight effects. Then <b>RESAMPLE</b>: the recording becomes the
       new source, and the recipe that made it is kept, so every sound can be <b>rebuilt bit for bit</b>.</p>
     <div class="ctas">
       <a class="btn" href="#try">Try the panel <span aria-hidden="true">↓</span></a>
-      <a class="btn ghost" href="#loop">How it works</a>
+      <a class="btn ghost" href="#guide">Your first sound</a>
     </div>
     <ul class="facts">
-      <li><b>6</b>sources: FM, analog, drums, and three ways to play a print</li>
+      <li><b>6</b>sources: FM, analog, drums, and three ways to play a resample</li>
       <li><b>9×4</b>6 LFOs and 3 envelopes, 4 destinations each</li>
       <li><b>8</b>FX slots in any order, 13 effect types</li>
       <li><b>64</b>bank sounds, each with its own generation tree</li>
@@ -371,15 +387,70 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <h3 id="try-title">This is the interface. Click it.</h3>
       </div>
       <p>The FM&#8209;1 panel as veffbox lays it out: 240×240 screen, 7 encoders, 14 buttons, 27 keys. Drag the knobs, press
-        <kbd>SEL</kbd> on <kbd>EDIT</kbd> to randomize, <kbd>REC</kbd> to print. The panel below it explains every click.</p>
+        <kbd>SEL</kbd> on <kbd>EDIT</kbd> to randomize, <kbd>REC</kbd> to resample. The panel below it explains every click.</p>
     </div>
     <div class="frame">
       <iframe id="demo" src="demo/index.html#t4/SRC" title="veffbox interface mockup: the FM-1 panel" loading="eager"></iframe>
     </div>
     <div class="frame-bar">
-      <span>Computer keyboard: <kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> <kbd>D</kbd> <kbd>C</kbd>… play the keys, <kbd>Space</kbd> PLAY, <kbd>Enter</kbd> print, <kbd>\</kbd> SEL (click the panel first).</span>
+      <span>Computer keyboard: <kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> <kbd>D</kbd> <kbd>C</kbd>… play the keys, <kbd>Space</kbd> PLAY, <kbd>Enter</kbd> resample, <kbd>\</kbd> SEL (click the panel first).</span>
       <a href="demo/index.html" target="_blank" rel="noopener">Open full screen ↗</a>
     </div>
+  </div>
+</section>
+
+<!-- GUIDE -->
+<section class="s" id="guide" aria-labelledby="guide-title">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="num">00 · Your first sound</span>
+      <h2 id="guide-title">From nothing to a bank<br>of your own sounds.</h2>
+      <p class="lead">Eight steps on the FM&#8209;1. You never lose anything: each roll can be undone, each resample is kept
+        with the recipe that made it, and a sound can always be rebuilt from scratch.</p>
+    </div>
+    <ol class="guide">
+      <li><h3>Pick an engine</h3><span class="do">EDIT · turn SELECT</span>
+        <p>EDIT opens the source page. Turn SELECT to choose the engine: OP4 (FM), ANLG (analog) or DRUM. The engine's
+          name is the big title. Play the keys to hear it.</p>
+        <p class="tip">The four knobs under the screen edit the row shown by the dots. Press EDIT again for the next row.
+          In DRUM, the key you press picks the voice the knobs shape. In OP4, the OP knob on the third row picks the
+          operator, A to D.</p></li>
+      <li><h3>Roll the engine</h3><span class="do">SEL · SEL · SEL…</span>
+        <p>On the source page, SEL is RANDOMIZE: new engine settings, and the sound plays once so you hear it. Tap again
+          for another roll. CHAOS on GLO sets how far a roll goes, from a nudge to a whole new sound.</p>
+        <p class="tip">Hold SEL for 0.6&nbsp;s to go back to the sound from before the first roll of the series.</p></li>
+      <li><h3>Give it a part</h3><span class="do">ARP · SEQ · PLAY</span>
+        <p>ARP picks the mode: NOTE (the keys), SEQ (a 16-step line) or CHORD (up to 8 chords with exact notes, each with
+          its own length, and a strum). SEQ edits the selected step: turn SELECT to move, press keys to enter notes. PLAY
+          starts and stops.</p></li>
+      <li><h3>Make it move</h3><span class="do">LFO · ENV · SEL = LEARN</span>
+        <p>Pick an LFO or envelope with SELECT, tap SEL, then turn any knob on any page: that parameter becomes one of its
+          four destinations. A <b>~</b> next to a knob's name means something modulates it.</p></li>
+      <li><h3>Scramble the effects</h3><span class="do">FX · SEL · SEL · SEL…</span>
+        <p>On the FX page, SEL is SCRAMBLE: a new chain of effects, with LFOs already routed into them. Tap a few times
+          until something clicks, and hold SEL to go back. Or build the chain by hand: SELECT picks the slot, the knobs
+          set TYPE, the amounts, MIX and the slot's position.</p></li>
+      <li><h3>Resample it</h3><span class="do">REC · from any page</span>
+        <p>REC records the whole chain as a new generation: G1, G2… With AFTER on FLAT (HOME), the effects and modulation
+          are cleared and the resample becomes the source, so you start fresh on the result.</p>
+        <p class="tip">HOME sets the resample: LEN (one note or 1, 2 or 4 bars), START on the grid, NORM, and how long the
+          tail rings.</p></li>
+      <li><h3>Bend the resample, and resample again</h3><span class="do">EDIT · SELECT: SAMP · GRAN · CHOP</span>
+        <p>Now the resample is the sound. Play it as a sample (SAMP), scatter it into grains (GRAN) or cut it at its
+          transients into slices on the keys (CHOP). Roll it with SEL, scramble new effects, then REC again. Every
+          round adds a generation, a child of the one before.</p></li>
+      <li><h3>Your tree, your bank</h3><span class="do">SAVE · SELECT · SEL</span>
+        <p>SAVE shows the sound's generation tree. Pick a generation with SELECT, choose an action with the DO knob, and
+          run it with SEL.</p>
+        <p><b>LOAD</b> plays its resample again. <b>EDIT</b> brings back the recipe that made it, so the next resample grows a
+          new branch and the old one stays. <b>RBLD</b> re-renders it from the first generation, bit for bit.</p>
+        <p class="tip">PRESETS picks which of the 64 bank sounds you are on, ALGORITHM which of the 4 tracks. Everything
+          saves itself to the FM&#8209;1's flash 2.5&nbsp;s after you stop playing. To fill the bank, turn PRESETS to an
+          empty sound and start again from step 1.</p></li>
+    </ol>
+    <p class="note">Why the tree can always be rebuilt: veffbox uses integer math only, and every random roll comes from a
+      seed stored in the recipe. A recipe is a few hundred bytes, so a sound keeps up to 12 generations in flash, while
+      audio is kept only for the last resample. REBUILD renders the rest from their recipes and gets the same bits back.</p>
   </div>
 </section>
 
@@ -389,12 +460,12 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     <div class="s-head">
       <span class="num">01 · The loop</span>
       <h2 id="loop-title">Five pages.<br>One direction.</h2>
-      <p class="lead">Everything you do is a step on one road: a source, played, modulated, run through effects, printed.
-        The print goes into the bank as a new generation and comes back as the source. Round you go.</p>
+      <p class="lead">Everything you do is a step on one road: a source, played, modulated, run through effects, resampled.
+        The resample goes into the bank as a new generation and comes back as the source. Round you go.</p>
     </div>
 
     <svg class="loop-svg loop-h" viewBox="0 0 1120 330" role="img" aria-labelledby="loop-h-t">
-      <title id="loop-h-t">SOURCE to PLAY to MOD to FX to PRINT. PRINT saves a generation in the BANK, and the print becomes the next SOURCE.</title>
+      <title id="loop-h-t">SOURCE to PLAY to MOD to FX to RESAMPLE. RESAMPLE saves a generation in the BANK, and the resample becomes the next SOURCE.</title>
       <defs>
         <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1d0819"/></marker>
       </defs>
@@ -414,16 +485,16 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <rect x="684" y="20" width="200" height="110" rx="24" fill="#f4d9ea"/>
         <text x="784" y="74" font-size="30" fill="#1d0819">FX</text><text x="784" y="104" font-size="15" fill="#9c2f69" font-weight="500">FX · SEL = SCRAMBLE</text>
         <rect x="912" y="20" width="200" height="110" rx="24" fill="#e07fb5"/>
-        <text x="1012" y="74" font-size="30" fill="#1d0819">PRINT</text><text x="1012" y="104" font-size="15" fill="#1d0819" font-weight="500">REC · from any page</text>
+        <text x="1012" y="74" font-size="30" fill="#1d0819">RESAMPLE</text><text x="1012" y="104" font-size="15" fill="#1d0819" font-weight="500">REC · from any page</text>
         <rect x="912" y="216" width="200" height="98" rx="24" fill="#1d0819"/>
         <text x="1012" y="261" font-size="28" fill="#e07fb5">BANK</text><text x="1012" y="290" font-size="15" fill="#f4d9ea" font-weight="500">SAVE · new generation</text>
         <rect x="300" y="248" width="420" height="34" rx="17" fill="#fcf2f8"/>
-        <text x="510" y="271" font-size="16" fill="#1d0819" letter-spacing="1.5">THE PRINT BECOMES THE NEXT SOURCE</text>
+        <text x="510" y="271" font-size="16" fill="#1d0819" letter-spacing="1.5">THE RESAMPLE BECOMES THE NEXT SOURCE</text>
       </g>
     </svg>
 
     <svg class="loop-svg loop-v" viewBox="0 0 360 660" role="img" aria-labelledby="loop-v-t">
-      <title id="loop-v-t">SOURCE to PLAY to MOD to FX to PRINT. PRINT saves a generation in the BANK, and the print becomes the next SOURCE.</title>
+      <title id="loop-v-t">SOURCE to PLAY to MOD to FX to RESAMPLE. RESAMPLE saves a generation in the BANK, and the resample becomes the next SOURCE.</title>
       <defs>
         <marker id="av" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1d0819"/></marker>
       </defs>
@@ -443,19 +514,19 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <rect x="90" y="310" width="220" height="76" rx="20" fill="#f4d9ea"/>
         <text x="200" y="346" font-size="26" fill="#1d0819">FX</text><text x="200" y="370" font-size="13" fill="#9c2f69" font-weight="500">FX · SEL = SCRAMBLE</text>
         <rect x="90" y="410" width="220" height="76" rx="20" fill="#e07fb5"/>
-        <text x="200" y="446" font-size="26" fill="#1d0819">PRINT</text><text x="200" y="470" font-size="13" fill="#1d0819" font-weight="500">REC · from any page</text>
+        <text x="200" y="446" font-size="26" fill="#1d0819">RESAMPLE</text><text x="200" y="470" font-size="13" fill="#1d0819" font-weight="500">REC · from any page</text>
         <rect x="90" y="542" width="220" height="96" rx="20" fill="#1d0819"/>
         <text x="200" y="584" font-size="26" fill="#e07fb5">BANK</text><text x="200" y="610" font-size="13" fill="#f4d9ea" font-weight="500">SAVE · new generation</text>
-        <text x="16" y="320" font-size="13" fill="#1d0819" letter-spacing="1.2" transform="rotate(-90 16 320)">THE PRINT BECOMES THE NEXT SOURCE</text>
+        <text x="16" y="320" font-size="13" fill="#1d0819" letter-spacing="1.2" transform="rotate(-90 16 320)">THE RESAMPLE BECOMES THE NEXT SOURCE</text>
       </g>
     </svg>
 
     <ol class="steps">
-      <li><b>Source</b><span class="btns">EDIT</span><p>Where the sound comes from: an FM, analog or drum engine, or the last print played as a sample, as grains or as slices.</p></li>
+      <li><b>Source</b><span class="btns">EDIT</span><p>Where the sound comes from: an FM, analog or drum engine, or the last resample played as a sample, as grains or as slices.</p></li>
       <li><b>Play</b><span class="btns">ARP · SEQ</span><p>From the keys, as a 16-step line, or as an 8-step chord sequence with exact notes and a strum.</p></li>
       <li><b>Mod</b><span class="btns">LFO · ENV</span><p>6 LFOs and 3 envelopes, each reaching 4 destinations anywhere on any page.</p></li>
       <li><b>FX</b><span class="btns">FX</span><p>Up to 8 effects in a chain, in any order, the same type more than once if you like.</p></li>
-      <li><b>Print</b><span class="btns">HOME · REC</span><p>Records the whole chain. The print is the next source; its recipe goes into the bank.</p></li>
+      <li><b>Resample</b><span class="btns">HOME · REC</span><p>Records the whole chain. The resample is the next source; its recipe goes into the bank.</p></li>
     </ol>
   </div>
 </section>
@@ -466,9 +537,9 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     <div class="s-head">
       <span class="num">02 · Sources</span>
       <h2 id="src-title">Three engines.<br>Three ways back in.</h2>
-      <p class="lead">Start from a synth engine. After the first print, the source can be the print itself: played as a
+      <p class="lead">Start from a synth engine. After the first resample, the source can be the resample itself: played as a
         sample, scattered into grains, or cut into slices. The knobs come in rows of four; press the page button again for
-        the next row.</p>
+        the next row. SELECT picks the engine.</p>
     </div>
 
     <p class="src-group">Engines: make a sound from nothing</p>
@@ -486,7 +557,6 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <ul><li>SAW SQR TRI PWM SIN NOIS</li><li>DET · SUB · SYNC</li><li>CUT · RES · ENV</li><li>DRV</li></ul>
       </article>
       <article class="card src">
-        <span class="tag ok">On the device</span>
         <div class="code">DRUM</div><div class="name">Eight 808-style voices</div>
         <p>Kick, snare, clap, hat, tom, rim, cowbell and cymbal, each with 8 shaping knobs: pitch sweep and its time,
           click, snap, metal, burst, choke. The keys play the voices.</p>
@@ -494,22 +564,22 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
       </article>
     </div>
 
-    <p class="src-group">Print sources: play the last generation</p>
+    <p class="src-group">Resample sources: play the last generation</p>
     <div class="grid g3">
       <article class="card src print">
-        <div class="code">SAMP</div><div class="name">The print as a sample</div>
+        <div class="code">SAMP</div><div class="name">The resample as a sample</div>
         <p>Start and length, one-shot, forward or ping-pong loop, reverse, pitch, fade and gain.</p>
         <ul><li>START · LEN</li><li>LOOP FWD / P-P</li><li>REV</li><li>PITCH ±24</li></ul>
       </article>
       <article class="card src print">
-        <div class="code">GRAN</div><div class="name">The print as grains</div>
+        <div class="code">GRAN</div><div class="name">The resample as grains</div>
         <p>Position, size, density and spray, random pitch and reverse grains, four window shapes, a freeze. Grain scatter
           comes from a seed, so a render repeats exactly.</p>
         <ul><li>POS · SIZE · DENS · SPRAY</li><li>HANN TRI RECT EXP</li><li>FRZ</li><li>SEED</li></ul>
       </article>
       <article class="card src print">
-        <div class="code">CHOP</div><div class="name">The print as slices</div>
-        <p>Transient detection cuts the print; SENS decides how many slices. Map them to the keys or to the steps, and
+        <div class="code">CHOP</div><div class="name">The resample as slices</div>
+        <p>Transient detection cuts the resample; SENS decides how many slices. Map them to the keys or to the steps, and
           play them in order, shuffled, stuttered or reversed.</p>
         <ul><li>SENS</li><li>SEQ SHUF STUT REV</li><li>MAP KEYS / STEPS</li></ul>
       </article>
@@ -678,7 +748,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <span class="big-key">SEL<small>HOLD</small></span>
         <h3>Hold SEL = undo</h3>
         <p>Holding SEL for 0.6&nbsp;s undoes the whole run of rolls, not just the last one. It works for RANDOMIZE and
-          SCRAMBLE alike. And since every roll comes from a seed, whatever you print is in the recipe.</p>
+          SCRAMBLE alike. And since every roll comes from a seed, whatever you resample is in the recipe.</p>
       </div>
     </div>
   </div>
@@ -688,10 +758,10 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
 <section class="s" id="print" aria-labelledby="print-title">
   <div class="wrap">
     <div class="s-head">
-      <span class="num">07 · Print and the generation tree</span>
-      <h2 id="print-title">Every print remembers how it was made.</h2>
-      <p class="lead"><b>REC</b> prints from any page. The output of the whole chain is recorded as a new generation, a
-        child of the one you started from. With <b>AFTER = FLAT</b>, effects and modulation are cleared and the print is
+      <span class="num">07 · Resample and the generation tree</span>
+      <h2 id="print-title">Every resample remembers how it was made.</h2>
+      <p class="lead"><b>REC</b> resamples from any page. The output of the whole chain is recorded as a new generation, a
+        child of the one you started from. With <b>AFTER = FLAT</b>, effects and modulation are cleared and the resample is
         loaded as the source, ready to be bent again.</p>
     </div>
     <div class="print-wrap">
@@ -699,8 +769,8 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <h3>LOAD, EDIT, REBUILD.</h3>
         <p>On <b>SAVE</b>, pick a generation with <b>SELECT</b> and run an action with <b>SEL</b>.</p>
         <div class="acts">
-          <div class="act"><b>LOAD</b>Its audio becomes the source. The next print is its child.</div>
-          <div class="act"><b>EDIT</b>Loads the recipe that made it. Change something, print, and a new branch grows next
+          <div class="act"><b>LOAD</b>Its audio becomes the source. The next resample is its child.</div>
+          <div class="act"><b>EDIT</b>Loads the recipe that made it. Change something, resample, and a new branch grows next
             to it. The original stays.</div>
           <div class="act"><b>REBUILD</b>Re-renders the path from G0 using recipes and seeds only. The result is
             bit-exact, so the audio does not need to be kept.</div>
@@ -708,7 +778,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
       </div>
       <div class="tree">
         <svg viewBox="0 0 640 300" role="img" aria-labelledby="tree-t">
-          <title id="tree-t">A generation tree: G0 INIT, G1 printed from OP4, G2 from GRAN and G3 from CHOP both children of G1, G4 a child of G2. REBUILD of G4 re-renders G0, G1, G2 and G4.</title>
+          <title id="tree-t">A generation tree: G0 INIT, G1 resampled from OP4, G2 from GRAN and G3 from CHOP both children of G1, G4 a child of G2. REBUILD of G4 re-renders G0, G1, G2 and G4.</title>
           <g fill="none" stroke-width="4" stroke-linecap="round">
             <path d="M120 150 H160" stroke="#e07fb5"/>
             <path d="M290 150 C 310 150, 310 80, 330 80" stroke="#e07fb5"/>
@@ -734,7 +804,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
       </div>
     </div>
 
-    <h3 class="sub-h">Print settings, on HOME.</h3>
+    <h3 class="sub-h">Resample settings, on HOME.</h3>
     <div class="settings">
       <div class="set"><b>LEN</b><em>NOTE · 1 · 2 · 4 BAR</em> how much to record</div>
       <div class="set"><b>START</b><em>GRID · FREE</em> on the beat or right away</div>
@@ -772,7 +842,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
           <div class="trk"><b>T3 · 05</b>SUB BASS</div>
           <div class="trk"><b>T4 · 06</b>BOOM KIT</div>
         </div>
-        <p class="meta">GLO holds what the tracks share: BPM, SCALE, ROOT, SWING and CHAOS.</p>
+        <p class="meta">GLO holds what the tracks share: BPM and CHAOS.</p>
       </div>
     </div>
   </div>
@@ -790,18 +860,18 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     <table class="map">
       <thead><tr><th>FM&#8209;1 control</th><th>veffbox</th><th>Details</th></tr></thead>
       <tbody>
-        <tr><td><span class="k">EDIT</span></td><td>SRC: the source</td><td>Engine or print source. SEL = RANDOMIZE.</td></tr>
+        <tr><td><span class="k">EDIT</span></td><td>SRC: the source</td><td>SELECT picks the engine or resample source; the keys pick the DRUM voice. SEL = RANDOMIZE.</td></tr>
         <tr><td><span class="k">ARP</span><span class="k">SEQ</span></td><td>PLAY</td><td>ARP: mode and strum row. SEQ: the step row (chord or note of the selected step).</td></tr>
         <tr><td><span class="k">LFO</span><span class="k">ENV</span></td><td>MOD</td><td>6 LFOs, 3 envelopes, 4 destinations each. SEL = LEARN.</td></tr>
         <tr><td><span class="k">FX</span></td><td>FX chain</td><td>8 slots, 13 types. SEL = SCRAMBLE.</td></tr>
-        <tr><td><span class="k">HOME</span></td><td>Print settings</td><td>LEN, START, NORM, AFTER, TAIL, FMT, SEED.</td></tr>
-        <tr><td><span class="k ink">REC</span></td><td>Print</td><td>From any page.</td></tr>
+        <tr><td><span class="k">HOME</span></td><td>Resample settings</td><td>LEN, START, NORM, AFTER, TAIL.</td></tr>
+        <tr><td><span class="k ink">REC</span></td><td>Resample</td><td>From any page.</td></tr>
         <tr><td><span class="k">SAVE</span></td><td>Bank</td><td>The generation tree: LOAD, EDIT, REBUILD.</td></tr>
-        <tr><td><span class="k">GLO</span></td><td>Global + CHAOS</td><td>BPM, SCALE, ROOT, SWING and how far the random rolls go.</td></tr>
+        <tr><td><span class="k">GLO</span></td><td>Global + CHAOS</td><td>BPM, and how far the random rolls go.</td></tr>
         <tr><td><span class="k">PLAY</span></td><td>Transport</td><td>Start and stop. Flash is only written while stopped.</td></tr>
-        <tr><td><span class="k">SEL</span></td><td>Act on the page</td><td>RANDOMIZE on SRC, SCRAMBLE on FX, LEARN on MOD, print on HOME, run the action on SAVE.</td></tr>
+        <tr><td><span class="k">SEL</span></td><td>Act on the page</td><td>RANDOMIZE on SRC, SCRAMBLE on FX, LEARN on MOD, resample on HOME, run the action on SAVE.</td></tr>
         <tr><td><span class="k">hold SEL</span></td><td>Undo</td><td>Takes back the whole run of random rolls.</td></tr>
-        <tr><td><span class="k">SELECT</span></td><td>Item on the page</td><td>Operator, drum voice, slice, step, LFO, FX slot or generation.</td></tr>
+        <tr><td><span class="k">SELECT</span></td><td>Engine, or the item on the page</td><td>The engine on SRC; the step, LFO, FX slot or generation elsewhere.</td></tr>
         <tr><td><span class="k">ALGORITHM</span></td><td>Track</td><td>Which of the 4 tracks you edit.</td></tr>
         <tr><td><span class="k">PRESETS</span></td><td>Sound</td><td>Which of the 64 bank sounds sits on the track.</td></tr>
         <tr><td><span class="k">KNOB 1–4</span></td><td>The lit row</td><td>Press the page button again for the next row.</td></tr>
@@ -824,16 +894,16 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     </div>
     <div class="status-grid">
       <div class="card now-card">
-        <span class="tag">Firmware 0.2.0</span>
+        <span class="tag">Firmware 0.2.1</span>
         <h3 style="margin-top:16px">Running on hardware today</h3>
         <p>Measured on a real FM&#8209;1: a strummed OP4 chord sequence through a scrambled FX chain peaks at 45% CPU,
           with no late audio buffers.</p>
         <ul>
-          <li><b>Sources</b>OP4, ANLG, DRUM, and SAMP, GRAN and CHOP playing the print</li>
+          <li><b>Sources</b>OP4, ANLG, DRUM, and SAMP, GRAN and CHOP playing the resample</li>
           <li><b>Play</b>keys, a 16-step line, or a chord sequence with exact notes and seven strums</li>
           <li><b>MOD</b>6 LFOs and 3 envelopes, 4 destinations each, LEARN</li>
           <li><b>FX</b>8 slots, 13 types, SCRAMBLE; hold SEL to undo</li>
-          <li><b>PRINT</b>the print becomes the source; generations are saved to flash</li>
+          <li><b>RESAMPLE</b>the resample becomes the source; generations are saved to flash</li>
           <li><b>REBUILD</b>re-renders a generation from its recipe, bit-exact</li>
         </ul>
       </div>
@@ -842,9 +912,9 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <li><span class="m">M1</span><span class="t">Portable core <span class="tag ok">done</span></span><span class="d">Six engines, 13 effects, modulation, the player, flash formats. Host tests for repeatability and overflow.</span></li>
         <li><span class="m">M2</span><span class="t">Platform <span class="tag ok">done</span></span><span class="d">MNM-1's hardware layer, loader and tools; its own identity, FM-1_62000100.</span></li>
         <li><span class="m">M3</span><span class="t">UI on the device <span class="tag ok">done</span></span><span class="d">Pages, rows, SELECT and SEL, RANDOMIZE and SCRAMBLE with undo, LEARN.</span></li>
-        <li><span class="m">M4</span><span class="t">PRINT <span class="tag ok">done</span></span><span class="d">The chain renders into RAM (1.67 s); SAMP, GRAN and CHOP play it.</span></li>
+        <li><span class="m">M4</span><span class="t">RESAMPLE <span class="tag ok">done</span></span><span class="d">The chain renders into RAM (1.67 s); SAMP, GRAN and CHOP play it.</span></li>
         <li><span class="m">M5</span><span class="t">Bank <span class="tag ok">done</span></span><span class="d">64 sounds and their generations in flash, LOAD, EDIT, REBUILD.</span></li>
-        <li><span class="m">M6</span><span class="t">Next</span><span class="d">Four tracks sounding at once, PITCH as a modulation target, longer prints, and the core in the browser so this page plays the real sound.</span></li>
+        <li><span class="m">M6</span><span class="t">Next</span><span class="d">Four tracks sounding at once, PITCH as a modulation target, longer resamples, and the core in the browser so this page plays the real sound.</span></li>
       </ol>
     </div>
   </div>
@@ -900,7 +970,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     <div class="foot">
       <div>
         <h4>About</h4>
-        <p>A resampling sound-design instrument for the M-VAVE FM&#8209;1, by Veff. One sound at a time: make it, print it,
+        <p>A resampling sound-design instrument for the M-VAVE FM&#8209;1, by Veff. One sound at a time: make it, resample it,
           make it the next sound.</p>
       </div>
       <div>
