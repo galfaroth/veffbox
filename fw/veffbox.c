@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox for the M-VAVE FM-1: one compilation unit.
+/* Veffbox for the M-VAVE FM-1: one compilation unit.
  *
  * The platform is MNM-1's, unchanged (copied into the build tree by tools/fm1_build.sh): the HAL, the LCD and
  * its canvas, the USB driver with the M-UPGRADE update entry, and the flash driver. Keeping the update path
- * identical to MNM-1's means a veffbox image can always be replaced with the normal installer.
- * The application (fw/vb_app.c) and the sound (core/) are veffbox's own. */
+ * identical to MNM-1's means a Veffbox image can always be replaced with the normal installer.
+ * The application (fw/vb_app.c) and the sound (core/) are Veffbox's own. */
 #include <stdint.h>
 #define FELUCCA_DUAL_CORE 0
 #define FELUCCA_CDC 0

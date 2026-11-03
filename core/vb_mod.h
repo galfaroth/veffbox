@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: modulation. 6 LFOs and 3 envelopes per sound; each source has up to 4
+/* Veffbox core: modulation. 6 LFOs and 3 envelopes per sound; each source has up to 4
  * destinations with its own bipolar amount. Destinations are flat parameter indices that the
  * sound's descriptor tables define (engine params, FX slot params, other LFOs' params).
  *

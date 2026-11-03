@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox application: the pages of the mockup (ui/index.html) on the FM-1.
+/* Veffbox application: the pages of the mockup (ui/index.html) on the FM-1.
  *
  *   EDIT  SRC: the source (OP4 ANLG DRUM SAMP GRAN CHOP)        SEL = RANDOMIZE, hold SEL = undo
  *   ARP   PLAY row 1 (mode, strum)   SEQ  PLAY step rows          keys enter chord notes / step-record
@@ -103,7 +103,7 @@ static void vb_all_off(void) { vb_player_panic(&vb_pl); }
 
 /* ---- UI state */
 enum { PG_SRC, PG_PLAY, PG_MOD, PG_FX, PG_PRINT, PG_BANK, PG_GLO, NPG };
-static const char *const PG_NAME[NPG] = {"SRC", "PLAY", "MOD", "FX", "PRINT", "BANK", "GLO"};
+static const char *const PG_NAME[NPG] = {"SRC", "PLAY", "MOD", "FX", "RESAMPLE", "BANK", "GLO"};
 static struct {
     uint8_t page, row[NPG], track, op, opsel, dvoice, oct, chaos, bank_do;
     int8_t learn_src, learn_slot;
@@ -887,12 +887,12 @@ static void undo(void)
 static void print_start(void)
 {
     if (RC->src >= VB_SRC_SAMP && !vb_pl.plen[vb_pl.cur]) {
-        say("NO PRINT YET");
+        say("NO RESAMPLE YET");
         return;
     }
     vb_player_print(&vb_pl);
     ui.printing = 1;
-    say("PRINTING...");
+    say("RESAMPLING...");
 }
 static void print_poll(void)
 {
@@ -930,7 +930,7 @@ static void print_poll(void)
     touch();
     str_cpy(b, "G", sizeof b);
     utoa10(b + 1, vb_curgen + 1u);
-    cat(b, " PRINTED", sizeof b);
+    cat(b, " RESAMPLED", sizeof b);
     say(b);
     dirty();
 }
@@ -950,7 +950,7 @@ static void bank_do(void)
         say("LOADED");
     } else if (ui.bank_do == 1) {                          /* EDIT: the recipe that made it */
         *RC = vb_gen[vb_curgen].rc;
-        say("EDIT: NEXT PRINT BRANCHES");
+        say("EDIT: NEXT ONE BRANCHES");
     } else {                                               /* REBUILD: render the chain from its root, offline */
         uint8_t path[VB_GENS];
         int g = vb_curgen, n = 0, k;
@@ -1343,7 +1343,10 @@ static void draw_hdr(void)
     build_rows();
     cv_begin(240, 40, C_BG);
     str_cpy(t, ui.page == PG_SRC ? SRC_N[RC->src] : ui.page == PG_PLAY ? MODE_N[RC->play.mode] : PG_NAME[ui.page], sizeof t);
-    md_text(8, 9, &MD_F3, 4, t, C_INK);
+    if (md_text_w(&MD_F3, 4, t) > 104)
+        md_text(8, 12, &MD_F3, 3, t, C_INK);
+    else
+        md_text(8, 9, &MD_F3, 4, t, C_INK);
     for (r = 0; r < NR && NR > 1u; r++) {
         cv_rect(118 + (int32_t)r * 9, 16, 7, 7, C_INK);
         if (r != ui.row[ui.page])
@@ -1413,8 +1416,8 @@ static void vis_print(void)
     uint32_t len = vb_pl.plen[vb_pl.cur], x, i;
     char t[24];
     if (!len) {
-        text_c(0, 240, 40, 4, "NO PRINT", C_INK);
-        text_c(0, 240, 74, 2, "PRESS REC TO PRINT", C_INK);
+        text_c(0, 240, 40, 4, "NOTHING YET", C_INK);
+        text_c(0, 240, 74, 2, "REC TO RESAMPLE", C_INK);
         return;
     }
     for (x = 0; x < 220u; x++) {
@@ -1620,11 +1623,19 @@ static void vis_print_page(void)
     cv_ring(52, 58, 40, C_INK);
     cv_ring(52, 58, 39, C_INK);
     {
-        int32_t r;
-        for (r = 0; r < 30; r++)
-            cv_ring(52, 58, r, C_INK);
+        int32_t dy, dx;
+        for (dy = -30; dy <= 30; dy++) {                   /* a solid disc: the label reads on it */
+            for (dx = 0; dx * dx + dy * dy <= 900; dx++)
+                ;
+            cv_rect(52 - dx + 1, 58 + dy, 2 * dx - 1, 1, C_INK);
+        }
     }
-    text_c(12, 80, 52, 2, ui.printing ? "REC" : "PRINT", C_BG);
+    if (ui.printing) {
+        text_c(12, 80, 52, 2, "REC", C_BG);
+    } else {
+        text_c(12, 80, 46, 2, "RE", C_BG);
+        text_c(12, 80, 60, 2, "SAMPLE", C_BG);
+    }
     str_cpy(t, "G", sizeof t);
     utoa10(t + 1, vb_ngen + 1u);
     md_text(112, 30, &MD_F3, 2, "NEXT", C_INK);
@@ -1646,7 +1657,7 @@ static void vis_bank(void)
     cat(t, "/64", sizeof t);
     md_text(8, 6, &MD_F3, 3, t, C_INK);
     if (!vb_ngen)
-        md_text(8, 50, &MD_F3, 2, "NO PRINTS YET", C_INK);
+        md_text(8, 50, &MD_F3, 2, "NOTHING RESAMPLED", C_INK);
     for (i = first; i < vb_ngen && i < first + 5u; i++) {
         int32_t y = 30 + (int32_t)(i - first) * 18;
         int s = i == vb_curgen;

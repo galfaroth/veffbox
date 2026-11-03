@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: the FX chain. Thirteen effect types for the 8 slots, integer only, deterministic.
+/* Veffbox core: the FX chain. Thirteen effect types for the 8 slots, integer only, deterministic.
  *
  * Every slot works on 32-sample chunks: the input is clamped to 16 bits (the dry copy), the type writes its wet signal
  * in place, then MIX blends dry and wet (gliding, ramped over the chunk) and the result is clamped to 16 bits again.

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>veffbox</title>
+<title>Veffbox</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -133,7 +133,7 @@ body{min-height:100vh;padding:16px;display:flex;flex-direction:column;align-item
 <p class="hint">
   <b>Knobs:</b> drag up/down or scroll; tap cycles lists. <b>SELECT</b> picks the item on the page, the <b>SEL</b> button acts on it
   (SRC: RANDOMIZE · FX: SCRAMBLE · MOD: LEARN); <b>hold SEL</b> = undo the random rolls. <b>ALGORITHM</b> changes the track, <b>PRESETS</b> the bank sound. Press a page again = next row.<br>
-  <b>Computer keyboard:</b> Z S X D C… and Q W 3 E 4… play the keys · Space PLAY · Enter REC (print) · Esc HOME · Backspace UNDO ·
+  <b>Computer keyboard:</b> Z S X D C… and Q W 3 E 4… play the keys · Space PLAY · Enter REC (resample) · Esc HOME · Backspace UNDO ·
   ←/→ OCT · [ ] SELECT · \ SEL · − = ALGORITHM
 </p>
 <aside class="side">
@@ -159,7 +159,7 @@ const DRV=[
  ['COWB','COW',['TUNE','DEC','DETUN','TONE','DRIVE','RING','Q','PAN'],[64,40,60,70,10,50,60,64]],
  ['CYMB','CYM',['TUNE','DEC','METAL','TONE','SPRD','DRIVE','Q','PAN'],[64,90,90,100,60,0,40,64]]];
 const OSCW=['SAW','SQR','TRI','PWM','SIN','NOIS'];
-const PAGES=['SRC','PLAY','MOD','FX','PRINT','BANK','GLO'];
+const PAGES=['SRC','PLAY','MOD','FX','RESAMPLE','BANK','GLO'];
 /* chord step length, in sixteenths */
 const LENS=[1,2,3,4,6,8,12,16,24,32,48,64];
 const LENN=['1/16','1/8','3/16','1/4','3/8','1/2','3/4','1 BAR','1½ BAR','2 BAR','3 BAR','4 BAR'];
@@ -175,7 +175,26 @@ const DIVS=['8/1','4/1','2/1','1/1','1/2','1/4','1/8','1/16','1/32'];
 const DIVB=[32,16,8,4,2,1,.5,.25,.125];
 const ONOFF=['OFF','ON'];
 /* modulation destinations are generated from the parameter descriptors (destList) */
-const FX=[['—','·',['','','','']],['DRIVE','DRV',['DRV','TONE','BIAS','OUT']],['FOLD','FLD',['AMT','SYM','PRE','OUT']],['CRUNCH','ADP',['AMT','RATE','HISS','OUT']],['BITS','BIT',['BITS','SR','JIT','OUT']],['FILTER','FLT',['CUT','RES','TYPE','DRV']],['TAPE DLY','DLY',['TIME','FB','HP','LP']],['REVERB','REV',['SIZE','DEC','DAMP','GATE']],['CHORUS','CHO',['RATE','DEP','FB','WIDE']],['PHASER','PHS',['RATE','DEP','CNTR','FB']],['RING','RNG',['TUNE','WAVE','EXT','KEY']],['RESON','RES',['TUNE','DEC','TONE','CHRD']],['FREEZE','FRZ',['SIZE','SPRY','PTCH','HOLD']],['SHIFT','SFT',['PTCH','FB','WIN','TONE']]];
+const FX=[['—','·',['','','','']],['DRIVE','DRV',['DRV','TONE','BIAS','OUT']],['FOLD','FLD',['AMT','SYM','PRE','OUT']],['CRUNCH','ADP',['AMT','RATE','HISS','OUT']],['BITS','BIT',['BITS','SR','JIT','OUT']],['FILTER','FLT',['CUT','RES','TYPE','DRV']],['TAPE DLY','DLY',['TIME','FB','HP','LP']],['REVERB','REV',['SIZE','DEC','DAMP','GATE']],['CHORUS','CHO',['RATE','DEP','FB','WIDE']],['PHASER','PHS',['RATE','DEP','CNTR','FB']],['RING','RNG',['TUNE','WAVE','EXT','KEY']],['RESON','RES',['TUNE','DEC','TONE','CHRD']],['FREEZE','FRZ',['SIZE','SPRY','PTCH','HOLD']],['SHIFT','SFT',['PTCH','FB','WIN','TONE']],
+ ['DUCK','DCK',['KEY','AMT','ATK','REL']],['GATE','GTE',['KEY','THR','ATK','REL']],
+ ['SPEC FREEZE','SPF',['HOLD','BLUR','TILT','RAND']],['SMEAR','SMR',['TIME','SPRD','DAMP','TILT']],
+ ['SPEC SHIFT','SPS',['SHFT','STRC','FB','TILT']],['SPEC GATE','SPG',['THR','KEEP','TILT','SMTH']],
+ ['ROBOT','RBT',['MODE','PTCH','TONE','SMTH']],['VOCODER','VOC',['KEY','BANDS','Q','SENS']]];
+/* keyed effects: KEY picks the track whose level drives them (a muted track still keys) */
+const KEYED=new Set(['DUCK','GATE','VOCODER']);
+const trkOf=v=>Math.min(3,v>>5),keyName=(t,v)=>t==='GATE'&&v<26?'SELF':'T'+(1+(t==='GATE'?Math.min(3,Math.floor((v-26)/26)):trkOf(v)));
+const FXFMT={DUCK:[v=>keyName('DUCK',v),v=>Math.round(v/127*100)+'%',null,null],GATE:[v=>keyName('GATE',v),null,null,null],
+ VOCODER:[v=>keyName('VOCODER',v),v=>[4,8,12,16][v>>5],null,null],ROBOT:[v=>v<64?'ROBOT':'WHISP',null,null,null],
+ 'SPEC GATE':[null,v=>v<64?'LOUD':'QUIET',null,null]};
+const FXD={DUCK:'Ducks this sound when the KEY track hits: the kick pumps the pad.',
+ GATE:'Opens only while the KEY track (or this sound itself) is above THR.',
+ 'SPEC FREEZE':'Holds the spectrum: band levels stay, phases roll. An endless pad from any hit.',
+ SMEAR:'Averages the spectrum over TIME: the sound melts into a cloud.',
+ 'SPEC SHIFT':'Moves and stretches the spectrum: inharmonic, metallic, detuned.',
+ 'SPEC GATE':'Keeps only the loudest bins (or only the quiet ones): tonal skeleton or pure air.',
+ ROBOT:'Zeroes the phases (robot) or randomizes them (whisper).',
+ VOCODER:'This sound as the carrier, shaped by the KEY track\'s bands: the pad talks in the drum\'s rhythm.'};
+const SCRAMBLE_FX=FX.map((f,i)=>i).filter(i=>i&&!KEYED.has(FX[i][0]));
 const ALG=[
  {e:[['D','C'],['C','B'],['B','A']],c:['A'],p:{D:[1,0],C:[1,1],B:[1,2],A:[1,3]}},
  {e:[['C','B'],['D','B'],['B','A']],c:['A'],p:{C:[0,1],D:[2,1],B:[1,2],A:[1,3]}},
@@ -192,17 +211,19 @@ const ALG=[
 
 /* page explanations (the "Now" panel) */
 const PAGE_INFO={
- SRC:{t:'Source',d:'Where the sound comes from. OP4 is 4-operator FM, ANLG a two-oscillator analog voice, DRUM eight 808-style voices (kick, snare, clap, hat, tom, rim, cowbell, cymbal) with shapeable pitch sweeps. SAMP, GRAN and CHOP play a print: audio from the previous generation. SEL = RANDOMIZE the engine.'},
+ SRC:{t:'Source',d:'Where the sound comes from. OP4 is 4-operator FM, ANLG a two-oscillator analog voice, DRUM eight 808-style voices (kick, snare, clap, hat, tom, rim, cowbell, cymbal) with shapeable pitch sweeps. SAMP, GRAN and CHOP play a resample: audio from the previous generation. SEL = RANDOMIZE the engine.'},
  PLAY:{t:'Play',d:'How the source is played: from the keys (NOTE), as one line (SEQ) or as a strummed chord sequence (CHORD). In CHORD every step has exact notes (a key adds or removes a note, N1–N4 set pitches) and its own LEN.'},
  GLO:{t:'Global',d:'Tempo, scale, root and the CHAOS amount used by RANDOMIZE and SCRAMBLE, shared by all tracks.'},
  MOD:{t:'Modulation',d:'6 LFOs and 3 envelopes. Each source has up to 4 destinations (D1–D4), each with its own bipolar amount (A1–A4). Pick a destination with a D knob or with LEARN: press SEL, then turn any parameter knob on any page. Modulated parameters show a ~.'},
  FX:{t:'FX chain',d:'8 slots in any order, types may repeat. Signal flows from slot 1 to 8. SEL = SCRAMBLE: a random, wild chain with LFOs patched into it.'},
- PRINT:{t:'Print',d:'Records the output of the whole chain as a new generation. The print becomes the new source and its recipe goes into the bank.'},
- BANK:{t:'Bank',d:'This sound\'s generation tree. LOAD plays a generation\'s audio. EDIT loads the recipe it was made from, so the next print starts a new branch. RBLD re-renders it from scratch.'},
+ RESAMPLE:{t:'Resample',d:'Records the output of the whole chain as a new generation. The resample becomes the new source and its recipe goes into the bank.'},
+ BANK:{t:'Bank',d:'This sound\'s generation tree. LOAD plays a generation\'s audio. EDIT loads the recipe it was made from, so the next resample starts a new branch. RBLD re-renders it from scratch.'},
 };
-const SEL_LBL={SRC:s=>s.src==='OP4'?'OP':s.src==='DRUM'?'VOICE':s.src==='CHOP'?'SLICE':'—',PLAY:()=>'STEP',MOD:()=>'SRC',FX:()=>'SLOT',PRINT:()=>'—',BANK:()=>'GEN',GLO:()=>'—'};
+const SEL_LBL={SRC:()=>'ENGINE',PLAY:()=>'STEP',MOD:()=>'SRC',FX:()=>'SLOT',RESAMPLE:()=>'—',BANK:()=>'GEN',GLO:()=>'—'};
 /* "why" hints for parameters */
 const WHY={
+ VOICING:'rewrites the step\'s notes from its pitch classes: CLOSE, OPEN, DROP2, SPREAD, or VEFF (root and fifth low, 9ths and 11ths packed high); edit any note after',
+ BASS:'a separate low note under the chord, played first by every strum; — = none',
  ALG:'the algorithm decides which operators modulate others and which ones you hear (carriers)',
  CRS:'operator frequency ratio to the note; integers sound harmonic, odd ratios metallic',
  FINE:'small operator detune; adds beating and motion',
@@ -210,8 +231,8 @@ const WHY={
  FIX:'fixed frequency, independent of the note; great for drums and metal',
  FB:'operator D feedback; from saw-like to noise',
  WAVE:'waveform',
- SRC:'change the source; SAMP/GRAN/CHOP need a print',
- POS:'where in the print the grains read from',SIZE:'grain length',DENS:'how many grains at once',SPRAY:'random scatter of grain positions',FRZ:'freezes grain positions',
+ SRC:'change the source; SAMP/GRAN/CHOP need a resample',
+ POS:'where in the resample the grains read from',SIZE:'grain length',DENS:'how many grains at once',SPRAY:'random scatter of grain positions',FRZ:'freezes grain positions',
  SEED:'randomness comes only from the seed, so the render is repeatable',
  SENS:'transient detection sensitivity, i.e. how many slices you get',SLICE:'which slice to edit',ORDER:'slice playback order',
  MODE:'how the source is played',STRUM:'how the chord notes are spread in time',TIME:'gap between strummed notes',HUMAN:'random timing and velocity drift',
@@ -226,7 +247,7 @@ const WHY={
  METAL:'metallic ring of the square bank',OPEN:'closed to open',CHOKE:'how hard the closed hat cuts the open one',NOISE:'noise amount',RING:'ring length',DETUN:'interval between the two tones',Q:'band-pass resonance',PAN:'stereo position',
  RATE:'speed',TRIG:'does it restart on each note',
  MIX:'dry/wet balance',ON:'bypass the slot, keeping its settings',MOVE:'moves the slot in the chain; order changes the sound',
- LEN:'length',START:'start the recording on the grid or right away',NORM:'normalize the print level',AFTER:'FLAT clears FX and MOD after the print, KEEP leaves everything',
+ LEN:'length',START:'start the recording on the grid or right away',NORM:'normalize the resample level',AFTER:'FLAT clears FX and MOD after the resample, KEEP leaves everything',
  FMT:'PCM: everything works; ADPCM: 4× more time, forward playback only',
  SOUND:'which of the 64 bank sounds sits on this track',GEN:'pick a generation in the tree',DO:'action for the selected generation'
 };
@@ -244,9 +265,28 @@ function chordName(st){
  const pcs=[...new Set(ns.map(n=>n%12))];
  for(const r of [ns[0]%12,...pcs]){const set=new Set(pcs.map(p=>(p-r+12)%12));
   for(const t of CT){const tp=new Set(t[2].map(x=>x%12));if(tp.size===set.size&&[...tp].every(x=>set.has(x)))return NOTES[r]+t[1]+(r!==ns[0]%12?'/'+NOTES[ns[0]%12]:'')}}
- return ns.length===1?noteName(ns[0]):NOTES[ns[0]%12]+'*';
+ if(ns.length===1)return noteName(ns[0]);
+ const r=st.root??ns[0]%12,h=new Set(pcs.map(p=>(p-r+12)%12)),sl=ns[0]%12!==r?'/'+NOTES[ns[0]%12]:'';   /* extended: root, 3rd, 7th, then 9 11 13 */
+ return NOTES[r]+(h.has(3)&&!h.has(4)?'m':'')+(h.has(10)?'7':h.has(11)?'maj7':'')+(h.has(2)?(h.has(10)||h.has(11)?'(9':'add9'):'')
+  +(h.has(5)&&(h.has(3)||h.has(4))?(h.has(2)&&(h.has(10)||h.has(11))?',11':'(11'):'')+((h.has(2)||h.has(5)&&(h.has(3)||h.has(4)))&&(h.has(10)||h.has(11))?')':'')+(!h.has(3)&&!h.has(4)?(h.has(5)?'sus4':h.has(2)?'sus2':''):'')+sl;
 }
-const fillChord=(st,root,type,base)=>{st.root=root;st.type=type;st.notes=CT[type][2].map(x=>base+root+x)};
+const fillChord=(st,root,type,base)=>{st.root=root;st.type=type;st.notes=CT[type][2].map(x=>base+root+x);if(st.voi)revoice(st,st.voi)};
+/* voicings: rewrite the step's notes from its pitch classes (what you see is what plays; edit any note after) */
+const VOICINGS=['CLOSE','OPEN','DROP2','SPREAD','VEFF'];
+const VOI_WHY=['all notes inside one octave','every other note an octave up: wider, airier','the second-highest note an octave down: the jazz-piano spread',
+ 'root low, a gap of a fifth or more, then the rest at least a third apart','root and fifth low, then 3rd, 7th, 9th (and 11th in minor) packed in seconds up high: the lush, wide sound of modern synth pop'];
+function revoice(c,v){
+ if(!c.notes.length)return;
+ const r=c.root,pcs=[...new Set(c.notes.map(n=>((n-r)%12+12)%12))].sort((a,b)=>a-b),a=48+r,lim=x=>clamp(x,24,96);
+ let out;
+ if(v===0)out=pcs.map(pc=>a+pc);
+ else if(v===1)out=pcs.map((pc,i)=>a+pc+(i%2?12:0));
+ else if(v===2){const cl=pcs.map(pc=>a+pc).sort((x,y)=>x-y);if(cl.length>2)cl[cl.length-2]-=12;out=cl}
+ else if(v===3){out=[a-12];let last=a-12;pcs.filter(pc=>pc).forEach((pc,i)=>{let n=a-12+pc;while(n<last+(i?3:7))n+=12;out.push(n);last=n})}
+ else{const minor=pcs.includes(3),up=[...new Set(pcs.filter(pc=>pc&&pc!==7).concat([2],minor?[5]:[]))];
+  out=[a-12,a-5];up.map(pc=>{let n=a+pc;while(n<a+3)n+=12;return n}).sort((x,y)=>x-y).forEach(n=>out.push(n));
+  out.push(a+19)}
+ c.notes=[...new Set(out.map(lim))].sort((x,y)=>x-y).slice(0,8);c.voi=v}
 const stepLen=st=>LENS[st.lenI];
 const lfoHz=v=>0.05*Math.pow(2,v/14);
 
@@ -270,15 +310,16 @@ function mkSound(name,seed){
    steps:[chord(0,4,7),chord(5,3,5),chord(9,4,5),chord(7,0,7),chord(0,4,7),chord(8,3,3),chord(5,7,5),chord(7,5,9)],
    seq:Array.from({length:16},(_,i)=>({on:[0,3,6,8,11,14].includes(i)?1:0,note:48+[0,0,3,0,0,7,0,0,5,0,0,3,0,0,10,0][i],slide:0,prob:100}))},
   mod:[0,1,2,3,4,5].map(i=>({kind:'L',routes:R4(),wave:i%LFOW.length,rate:40+i*10,trig:0,phase:0,sync:1}))
-   .concat([0,1,2].map(()=>({kind:'E',routes:R4(),atk:5,dec:40,sus:0,rel:20,loop:0,vel:64}))),
+   .concat([0,1,2].map(()=>({kind:'E',routes:R4(),atk:5,dec:40,sus:0,rel:20,loop:0,vel:64})))
+   .concat([{kind:'S',routes:R4(),key:0,atk:4,rel:40,gain:64}]),
   modSel:0,
   fx:Array.from({length:8},()=>({type:0,v:[64,64,64,64],mix:127,on:1})),fxSel:0,
-  print:{len:1,start:0,norm:1,after:0,tail:0,fmt:0},
+  resample:{len:1,start:0,norm:1,after:0,tail:0,fmt:0},
   gens:[{id:0,parent:null,src:'INIT',label:'INIT',seed,recipe:null,audio:false}],
   cur:0,input:null,genSel:0,nextG:1};
 }
 const BANK_N=64;
-const RECIPE=['src','alg','opSel','fb','op','drum','anlg','samp','gran','chop','play','mod','fx','print'];
+const RECIPE=['src','alg','opSel','fb','op','drum','anlg','samp','gran','chop','play','mod','fx','resample'];
 function snapshot(s){const r={};RECIPE.forEach(k=>r[k]=clone(s[k]));return r}
 function summary(s){
  const nf=s.fx.filter(f=>f.type&&f.on).length,nm=s.mod.filter(liveM).length;
@@ -290,11 +331,11 @@ const gById=(s,id)=>s.gens.find(g=>g.id===id);
 function tree(s){const out=[];const walk=(g,d)=>{out.push({g,d});s.gens.filter(k=>k.parent===g.id).forEach(k=>walk(k,d+1))};walk(s.gens[0],0);return out}
 function setFx(s,i,name){s.fx[i].type=FX.findIndex(f=>f[0]===name);s.fx[i].v=[70,50,60,90]}
 
-function finishPrint(s){
+function finishResample(s){
  const id=s.nextG++;
  const g={id,parent:s.cur,src:s.src,label:summary(s),seed:genSeed(s,id),recipe:snapshot(s),audio:true};
  s.gens.push(g);s.cur=id;s.input=id;
- if(s.print.after===0){s.fx.forEach(f=>{f.type=0});s.mod.forEach(m=>{m.routes=R4()});if(isSynth(s))s.src='SAMP'}
+ if(s.resample.after===0){s.fx.forEach(f=>{f.type=0});s.mod.forEach(m=>{m.routes=R4()});if(isSynth(s))s.src='SAMP'}
  s.genSel=tree(s).findIndex(t=>t.g.id===id);
  return g;
 }
@@ -324,23 +365,23 @@ function slices(s){
 }
 
 /* ───────── state ───────── */
-const S={bank:[],tracks:[0,1,4,5],tr:0,page:'SRC',row:{SRC:0,PLAY:0,MOD:0,FX:0,PRINT:0,BANK:0,GLO:0},bankDo:0,
- oct:0,vol:100,scale:0,root:0,swing:50,chaos:70,dice:0,undo:null,down:new Set(),
- playing:false,playT0:0,bpm:120,printing:null,rebuilding:null,msg:null,log:[]};
+const S={bank:[],tracks:[0,1,4,5],tr:0,page:'SRC',row:{SRC:0,PLAY:0,MOD:0,FX:0,RESAMPLE:0,BANK:0,GLO:0},bankDo:0,
+ mute:[0,0,0,0],oct:0,vol:100,scale:0,root:0,swing:50,chaos:70,dice:0,undo:null,down:new Set(),
+ playing:false,playT0:0,bpm:120,resampling:null,rebuilding:null,msg:null,log:[]};
 const snd=()=>S.bank[S.tracks[S.tr]];
 
 function demo(){
  const s0=mkSound('INIT',101);
  const s1=mkSound('GRIT PAD',4711);s1.alg=6;s1.play.strum=4;
  route(s1,0,0,'B LVL',30);route(s1,0,1,'FX1 DRV',20);route(s1,0,2,'OP FB',-14);route(s1,6,0,'PITCH',-18);
- setFx(s1,0,'DRIVE');setFx(s1,1,'CRUNCH');setFx(s1,2,'TAPE DLY');finishPrint(s1);
- s1.src='GRAN';setFx(s1,0,'REVERB');route(s1,1,0,'GR POS',22);route(s1,1,1,'GR SPRAY',30);route(s1,1,2,'FX1 SIZE',-20);finishPrint(s1);
- s1.cur=1;s1.input=1;s1.src='CHOP';setFx(s1,0,'BITS');setFx(s1,1,'RESON');finishPrint(s1);
+ setFx(s1,0,'DRIVE');setFx(s1,1,'CRUNCH');setFx(s1,2,'TAPE DLY');finishResample(s1);
+ s1.src='GRAN';setFx(s1,0,'REVERB');route(s1,1,0,'GR POS',22);route(s1,1,1,'GR SPRAY',30);route(s1,1,2,'FX1 SIZE',-20);finishResample(s1);
+ s1.cur=1;s1.input=1;s1.src='CHOP';setFx(s1,0,'BITS');setFx(s1,1,'RESON');finishResample(s1);
  s1.cur=2;s1.input=2;s1.src='GRAN';setFx(s1,0,'FREEZE');setFx(s1,1,'SHIFT');route(s1,1,0,'GR SIZE',40);route(s1,1,1,'GR POS',18);route(s1,1,2,'FX1 SPRY',25);route(s1,1,3,'FX2 PTCH',-8);
  s1.genSel=tree(s1).findIndex(t=>t.g.id===2);s1.modSel=1;
- const s2=mkSound('BELL HIT',2024);s2.alg=6;s2.op[3].fix=1;s2.op[1].crs=3;s2.op[1].fine=50;s2.play.mode=0;s2.print.len=0;
- setFx(s2,0,'REVERB');finishPrint(s2);s2.src='CHOP';setFx(s2,0,'FOLD');
- const s3=mkSound('VOX AIR',77);s3.alg=1;s3.play.mode=1;setFx(s3,0,'CHORUS');setFx(s3,1,'FILTER');finishPrint(s3);
+ const s2=mkSound('BELL HIT',2024);s2.alg=6;s2.op[3].fix=1;s2.op[1].crs=3;s2.op[1].fine=50;s2.play.mode=0;s2.resample.len=0;
+ setFx(s2,0,'REVERB');finishResample(s2);s2.src='CHOP';setFx(s2,0,'FOLD');
+ const s3=mkSound('VOX AIR',77);s3.alg=1;s3.play.mode=1;setFx(s3,0,'CHORUS');setFx(s3,1,'FILTER');finishResample(s3);
  s3.samp.rev=1;s3.samp.loop=1;setFx(s3,0,'PHASER');
  const s4=mkSound('SUB BASS',5);s4.src='ANLG';s4.play.mode=1;route(s4,0,0,'AN CUT',28);route(s4,0,1,'AN PW',20);route(s4,0,2,'FX1 DRV',12);route(s4,1,0,'AN DET',10);route(s4,6,0,'AN RES',-16);setFx(s4,0,'DRIVE');
  const s5=mkSound('BOOM KIT',9);s5.src='DRUM';s5.play.mode=1;route(s5,0,0,'KCK SWEEP',24);route(s5,0,1,'HAT DEC',30);route(s5,1,0,'SNR N TON',-20);route(s5,6,0,'KCK DRIVE',18);setFx(s5,0,'DRIVE');setFx(s5,1,'TAPE DLY');
@@ -359,28 +400,26 @@ function rows(s){
   if(s.src==='OP4'){const o=s.op[s.opSel];return[
    [Ls('WAVE',o,'wave',WAVES),P('CRS',o,'crs',0,32,v=>v?v:'½'),P('FINE',o,'fine',0,99),P('LVL',o,'lvl',0,127)],
    [P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127),P('SUS',o,'sus',0,127),P('REL',o,'rel',0,127)],
-   [P('ALG',s,'alg',0,10,v=>v+1),P('FB',s,'fb',0,127),Ls('FIX',o,'fix',ONOFF),srcP(s)]]}
+   [P('ALG',s,'alg',0,10,v=>v+1),P('FB',s,'fb',0,127),Ls('FIX',o,'fix',ONOFF),{l:'OP',get:()=>s.opSel,set:v=>{s.opSel=v},min:0,max:3,f:v=>OPS[v]}]]}
   if(s.src==='DRUM'){const o=s.drum,v=o.voice,d=DRV[v],pp=i=>({l:d[2][i],get:()=>o.p[v][i],set:x=>{o.p[v][i]=x},min:0,max:127,f:x=>x});
-   return[[Ls('VOICE',o,'voice',DRV.map(x=>x[0])),{l:'LEVEL',get:()=>o.lvl[v],set:x=>{o.lvl[v]=x},min:0,max:127,f:x=>x},pp(0),pp(1)],
-    [pp(2),pp(3),pp(4),pp(5)],[pp(6),pp(7),null,srcP(s)]]}
+   return[[pp(0),pp(1),pp(2),pp(3)],[pp(4),pp(5),pp(6),pp(7)],
+    [{l:'LEVEL',get:()=>o.lvl[v],set:x=>{o.lvl[v]=x},min:0,max:127,f:x=>x},Ls('VOICE',o,'voice',DRV.map(x=>x[0])),null,null]]}
   if(s.src==='ANLG'){const o=s.anlg;return[
    [Ls('OSC1',o,'o1',OSCW),Ls('OSC2',o,'o2',OSCW),P('DET',o,'det',0,100,v=>v+'c'),P('MIX',o,'mix',0,127)],
    [P('SUB',o,'sub',0,127),P('NOIS',o,'nois',0,127),Ls('SYNC',o,'sync',ONOFF),P('PW',o,'pw',0,127)],
    [P('CUT',o,'cut',0,127),P('RES',o,'res',0,127),P('ENV',o,'env',0,127,v=>sgn(v-64)),P('DRV',o,'drv',0,127)],
-   [P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127),P('SUS',o,'sus',0,127),P('REL',o,'rel',0,127)],
-   [srcP(s),null,null,null]]}
+   [P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127),P('SUS',o,'sus',0,127),P('REL',o,'rel',0,127)]]}
   if(s.src==='SAMP'){const o=s.samp;return[
    [P('START',o,'start',0,126),P('LEN',o,'len',1,127),Ls('LOOP',o,'loop',['OFF','FWD','P-P']),Ls('REV',o,'rev',ONOFF)],
-   [P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),P('FINE',o,'fine',0,99),P('FADE',o,'fade',0,127),P('GAIN',o,'gain',0,127)],
-   [srcP(s),null,null,null]]}
+   [P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),P('FINE',o,'fine',0,99),P('FADE',o,'fade',0,127),P('GAIN',o,'gain',0,127)]]}
   if(s.src==='GRAN'){const o=s.gran;return[
    [P('POS',o,'pos',0,127),P('SIZE',o,'size',0,127),P('DENS',o,'dens',0,127),P('SPRAY',o,'spray',0,127)],
    [P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),P('PRND',o,'prnd',0,127),P('REV',o,'rev',0,127,v=>Math.round(v/127*100)+'%'),Ls('WIN',o,'win',['HANN','TRI','RECT','EXP'])],
-   [Ls('FRZ',o,'frz',ONOFF),P('WIDTH',o,'width',0,127),P('SEED',o,'seed',0,999),srcP(s)]]}
+   [Ls('FRZ',o,'frz',ONOFF),P('WIDTH',o,'width',0,127),P('SEED',o,'seed',0,999),null]]}
   const o=s.chop,n=slices(s).length;return[
    [P('SENS',o,'sens',0,127),P('SLICE',o,'slice',0,Math.max(0,n-1),v=>v+1),P('PITCH',o,'pitch',0,48,v=>sgn(v-24)),Ls('REV',o,'rev',ONOFF)],
    [Ls('ORDER',o,'order',['SEQ','SHUF','STUT','REV']),P('LEN',o,'len',1,127),P('ATK',o,'atk',0,127),P('DEC',o,'dec',0,127)],
-   [Ls('MAP',o,'map',['KEYS','STEPS']),null,null,srcP(s)]]}
+   [Ls('MAP',o,'map',['KEYS','STEPS']),null,null,null]]}
  case 'PLAY':{
   const r0=[Ls('MODE',p,'mode',PMODES),Ls('STRUM',p,'strum',STRUMS),P('TIME',p,'time',0,127,v=>Math.round(v/127*250)+'ms'),P('HUMAN',p,'hum',0,127)];
   const steps=P('STEPS',p,'len',1,p.mode===1?16:8);
@@ -389,7 +428,10 @@ function rows(s){
    const root={l:'ROOT',get:()=>c.root,set:v=>{const d=v-c.root;c.notes=c.notes.map(n=>clamp(n+d,24,96));c.root=v},min:0,max:11,f:v=>NOTES[v]};
    const type={l:'TYPE',get:()=>c.type,set:v=>{const lo=c.notes.length?Math.min(...c.notes):48+c.root;fillChord(c,c.root,v,lo-((lo-c.root)%12+12)%12-c.root)},min:0,max:CT.length-1,f:v=>CT[v][0]};
    const nk=i=>({l:'N'+(i+1),get:()=>c.notes[i]??23,set:v=>{if(v===23){if(i<c.notes.length)c.notes.splice(i,1)}else if(i<c.notes.length)c.notes[i]=v;else c.notes.push(v)},min:23,max:96,f:v=>v===23?'—':noteName(v)});
-   return[r0,[root,type,P('LEN',c,'lenI',0,LENS.length-1,v=>LENN[v]),P('GATE',c,'gate',5,100,v=>v+'%')],[0,1,2,3].map(nk),rL]}
+   const voi={l:'VOICING',get:()=>c.voi||0,set:v=>revoice(c,v),min:0,max:VOICINGS.length-1,f:v=>VOICINGS[v]};
+   const bass={l:'BASS',get:()=>c.bass??23,set:v=>{c.bass=v===23?null:v},min:23,max:60,f:v=>v===23?'—':noteName(v)};
+   return[r0,[root,type,P('LEN',c,'lenI',0,LENS.length-1,v=>LENN[v]),P('GATE',c,'gate',5,100,v=>v+'%')],[voi,bass,null,null],
+    [0,1,2,3].map(nk),[4,5,6,7].map(nk),rL]}
   if(p.mode===1){const c=p.seq[p.sel];return[r0,[P('NOTE',c,'note',24,96,noteName),Ls('ON',c,'on',ONOFF),Ls('SLIDE',c,'slide',ONOFF),P('PROB',c,'prob',0,100,v=>v+'%')],rL]}
   return[r0,rL]}
  case 'MOD':{
@@ -399,6 +441,8 @@ function rows(s){
    {l:'A'+(i+1),get:()=>r.amt,set:v=>{r.amt=v},min:-64,max:63,f:sgn}]};
   if(m.kind==='L')return[[Ls('WAVE',m,'wave',LFOW),P('RATE',m,'rate',0,127,v=>m.sync?DIVS[Math.round(v/127*8)]:lfoHz(v).toFixed(lfoHz(v)<10?2:1)),Ls('SYNC',m,'sync',ONOFF),Ls('TRIG',m,'trig',TRIGS)],
    [...rt(0),...rt(1)],[...rt(2),...rt(3)],[P('PHASE',m,'phase',0,127,v=>Math.round(v/127*360)+'°'),null,null,null]];
+  if(m.kind==='S')return[[P('KEY',m,'key',0,3,v=>'T'+(v+1)),P('ATK',m,'atk',0,127),P('REL',m,'rel',0,127),P('GAIN',m,'gain',0,127)],
+   [...rt(0),...rt(1)],[...rt(2),...rt(3)]];
   return[[P('ATK',m,'atk',0,127),P('DEC',m,'dec',0,127),P('SUS',m,'sus',0,127),P('REL',m,'rel',0,127)],
    [...rt(0),...rt(1)],[...rt(2),...rt(3)],[Ls('LOOP',m,'loop',ELOOP),P('VEL',m,'vel',0,127),null,null]]}
  case 'FX':{
@@ -407,11 +451,13 @@ function rows(s){
   const r1=[tp,P('MIX',f,'mix',0,127,v=>Math.round(v/127*100)+'%'),Ls('ON',f,'on',ONOFF),
    {l:'MOVE',get:()=>s.fxSel,set:v=>{const t=s.fx[v];s.fx[v]=s.fx[s.fxSel];s.fx[s.fxSel]=t;s.fxSel=v},min:0,max:7,f:v=>v+1}];
   if(!f.type)return[[tp,null,null,null],r1];
-  return[FX[f.type][2].map((l,i)=>({l,get:()=>f.v[i],set:v=>{f.v[i]=v},min:0,max:127,f:v=>v})),r1]}
- case 'PRINT':{const o=s.print;return[
+  const fm=FXFMT[FX[f.type][0]]||[];
+  return[FX[f.type][2].map((l,i)=>({l,get:()=>f.v[i],set:v=>{f.v[i]=v},min:0,max:127,f:fm[i]||(v=>v)})),r1]}
+ case 'RESAMPLE':{const o=s.resample;return[
   [Ls('LEN',o,'len',['NOTE','1 BAR','2 BAR','4 BAR']),Ls('START',o,'start',['GRID','FREE']),Ls('NORM',o,'norm',ONOFF),Ls('AFTER',o,'after',['FLAT','KEEP'])],
   [Ls('TAIL',o,'tail',['AUTO','0.5s','1s','2s']),Ls('FMT',o,'fmt',['PCM','ADPCM']),P('SEED',s,'seed',0,9999),null]]}
- case 'GLO':return[[P('BPM',S,'bpm',40,240),Ls('SCALE',S,'scale',SCALES),Ls('ROOT',S,'root',NOTES),P('SWING',S,'swing',50,75,v=>v+'%')],[P('CHAOS',S,'chaos',0,100,v=>v+'%'),null,null,null]];
+ case 'GLO':return[[P('BPM',S,'bpm',40,240),Ls('SCALE',S,'scale',SCALES),Ls('ROOT',S,'root',NOTES),P('SWING',S,'swing',50,75,v=>v+'%')],[P('CHAOS',S,'chaos',0,100,v=>v+'%'),null,null,null],
+  [0,1,2,3].map(t=>({l:'T'+(t+1),get:()=>S.mute[t],set:v=>{S.mute[t]=v},min:0,max:1,f:v=>v?'MUTE':'ON'}))];
  case 'BANK':{const tr=tree(s);return[
   [{l:'SOUND',get:()=>S.tracks[S.tr],set:v=>{S.tracks[S.tr]=v},min:0,max:S.bank.length-1,f:v=>String(v+1).padStart(2,'0')},
    P('GEN',s,'genSel',0,tr.length-1,v=>'G'+tr[v].g.id),Ls('DO',S,'bankDo',['LOAD','EDIT','RBLD']),null]]}
@@ -419,9 +465,9 @@ function rows(s){
  return[[null,null,null,null]];
 }
 /* modulation destination name for a parameter in the current context (page + selected operator/slot/source) */
-const NOMOD=new Set(['VOICE','SRC','MODE','TYPE','MOVE','ON','STEPS','SEED','MAP','ORDER','FIX','SYNC','TRIG','LOOP','ROOT','LEN','GATE','NOTE','SLIDE','PROB','ALG','WIN','FRZ','REV','STRUM','OSC1','OSC2','WAVE',
+const NOMOD=new Set(['VOICE','SRC','KEY','BANDS','T1','T2','T3','T4','VOICING','BASS','N5','N6','N7','N8','MODE','TYPE','MOVE','ON','STEPS','SEED','MAP','ORDER','FIX','SYNC','TRIG','LOOP','ROOT','LEN','GATE','NOTE','SLIDE','PROB','ALG','WIN','FRZ','REV','STRUM','OSC1','OSC2','WAVE',
  'D1','D2','D3','D4','A1','A2','A3','A4','N1','N2','N3','N4']);
-const modShort=i=>i<6?'L'+(i+1):'E'+(i-5);
+const modShort=i=>i<6?'L'+(i+1):i<9?'E'+(i-5):'SC';
 function destName(s,p){
  if(!p||NOMOD.has(p.l))return null;
  switch(S.page){
@@ -441,7 +487,7 @@ function destList(s){
   S.page='SRC';const dv=s.drum.voice;if(s.src==='OP4')for(let i=0;i<4;i++){s.opSel=i;add()}else if(s.src==='DRUM'){for(let i=0;i<8;i++){s.drum.voice=i;add()}s.drum.voice=dv}else add();
   S.page='PLAY';add();
   S.page='FX';for(let i=0;i<8;i++)if(s.fx[i].type){s.fxSel=i;add()}
-  S.page='MOD';for(let i=0;i<9;i++){s.modSel=i;add()}
+  S.page='MOD';for(let i=0;i<10;i++){s.modSel=i;add()}
  }finally{[S.page,s.opSel,s.fxSel,s.modSel]=save;DL_BUSY=false}
  s.mod.forEach(m=>m.routes.forEach(r=>{if(!out.includes(r.dest))out.push(r.dest)}));
  return out;
@@ -477,15 +523,13 @@ function knobTap(i){const s=snd(),p=(rows(s)[curRow(s)]||[])[i];if(!p)return;if(
 function sel(d){
  const s=snd(),p=s.play;let what='';
  switch(S.page){
-  case 'SRC':if(s.src==='OP4'){s.opSel=clamp(s.opSel+d,0,3);what='OPERATOR '+OPS[s.opSel]}
-   else if(s.src==='DRUM'){s.drum.voice=clamp(s.drum.voice+d,0,7);what='VOICE '+DRV[s.drum.voice][0]}
-   else if(s.src==='CHOP'){s.chop.slice=clamp(s.chop.slice+d,0,Math.max(0,slices(s).length-1));what='SLICE '+(s.chop.slice+1)}break;
+  case 'SRC':{const i=clamp(SRCS.indexOf(s.src)+d,0,SRCS.length-1);if(SRCS[i]!==s.src){s.src=SRCS[i];S.row.SRC=0;what='ENGINE '+s.src}break}
   case 'PLAY':p.sel=clamp(p.sel+d,0,(p.mode===1?16:8)-1);what='STEP '+(p.sel+1);break;
-  case 'MOD':s.modSel=clamp(s.modSel+d,0,8);what=modName(s.modSel);break;
+  case 'MOD':s.modSel=clamp(s.modSel+d,0,9);what=modName(s.modSel);break;
   case 'FX':s.fxSel=clamp(s.fxSel+d,0,7);what='SLOT '+(s.fxSel+1)+' '+FX[s.fx[s.fxSel].type][0];break;
   case 'BANK':s.genSel=clamp(s.genSel+d,0,tree(s).length-1);what='G'+tree(s)[s.genSel].g.id;break;
  }
- if(what)log('SELECT → '+what,'SELECT picks which item on the page the knobs edit.','sel'+S.page);
+ if(what)log('SELECT → '+what,S.page==='SRC'?'On SRC, SELECT picks the engine. In DRUM the keys pick the voice the knobs shape; in OP4 the OP knob (row 3) picks the operator.':'SELECT picks which item on the page the knobs edit.','sel'+S.page);
  render();
 }
 function selPress(){
@@ -499,15 +543,15 @@ function selPress(){
  }
  if(S.page==='SRC')return doRandom('SRC');
  if(S.page==='FX')return doRandom('FX');
- if(S.page==='PRINT')return doPrint();
+ if(S.page==='RESAMPLE')return doResample();
  if(S.page==='BANK')return bankDo(['LOAD','EDIT','RBLD'][S.bankDo]);
  if(S.page==='PLAY'&&s.play.mode===1){const c=s.play.seq[s.play.sel];c.on^=1;log(`STEP ${s.play.sel+1} ${c.on?'ON':'OFF'}`,'SEL turns the step on or off.');render()}
 }
-const modName=i=>i<6?'LFO '+(i+1):'ENV '+(i-5);
+const modName=i=>i<6?'LFO '+(i+1):i<9?'ENV '+(i-5):'SIDECHAIN';
 function pressPage(pg){
  const s=snd();
  if(S.page===pg){const n=rows(s).length;if(n>1){S.row[pg]=(curRow(s)+1)%n;log(`${pg}: row ${S.row[pg]+1}/${n}`,'Pressing the page again moves to the next row. The 4 knobs always edit the lit row.')}}
- else{S.page=pg;log('Strona '+pg,PAGE_INFO[pg].d)}
+ else{S.page=pg;log('Page '+pg,PAGE_INFO[pg].d)}
  render();
 }
 function selTrack(i){
@@ -518,12 +562,12 @@ function togglePlay(){
  S.playing=!S.playing;S.playT0=performance.now();
  log(S.playing?'▶ PLAY':'■ STOP',S.playing?'The selected track\'s sequence or chords play. The other tracks play too.':'Transport stopped. Only now can flash be written without an audio dropout.');render();
 }
-function doPrint(){
- const s=snd();if(S.printing)return;
- if(!isSynth(s)&&s.input==null){flash('NO INPUT · PRINT A SYNTH FIRST');log('● PRINT: no input',`${s.src} plays audio from a print, and this sound has none yet. Print from OP4 or ANLG first.`);render();return}
+function doResample(){
+ const s=snd();if(S.resampling)return;
+ if(!isSynth(s)&&s.input==null){flash('NO INPUT · RESAMPLE A SYNTH FIRST');log('● RESAMPLE: no input',`${s.src} plays audio from a resample, and this sound has none yet. Resample from OP4 or ANLG first.`);render();return}
  const id=s.nextG;
- S.printing={s,t:performance.now(),dur:[1200,2000,3000,4000][s.print.len],id,seed:genSeed(s,id)};
- log(`● PRINT → G${id}`,`Recording the whole chain (${summary(s)}). Audio and recipe are saved as G${id}, a child of G${s.cur}. ${s.print.after===0?'FLAT: FX and MOD are cleared afterwards and the print becomes the source.':'KEEP: the chain stays.'}`);
+ S.resampling={s,t:performance.now(),dur:[1200,2000,3000,4000][s.resample.len],id,seed:genSeed(s,id)};
+ log(`● RESAMPLE → G${id}`,`Recording the whole chain (${summary(s)}). Audio and recipe are saved as G${id}, a child of G${s.cur}. ${s.resample.after===0?'FLAT: FX and MOD are cleared afterwards and the resample becomes the source.':'KEEP: the chain stays.'}`);
  render();
 }
 /* ───────── RANDOMIZE (engine) and SCRAMBLE (FX chain + LFOs) ───────── */
@@ -556,7 +600,7 @@ function scrambleFx(s,r){
  const c=S.chaos/100,n=clamp(2+Math.floor(r()*(1+c*5)),2,8),amtK=.4+.6*c;
  s.fx=Array.from({length:8},()=>({type:0,v:[64,64,64,64],mix:127,on:1}));
  let prev=0;
- for(let i=0;i<n;i++){let ty;do ty=1+Math.floor(r()*(FX.length-1));while(ty===prev&&r()>c);prev=ty;
+ for(let i=0;i<n;i++){let ty;do ty=SCRAMBLE_FX[Math.floor(r()*SCRAMBLE_FX.length)];while(ty===prev&&r()>c);prev=ty;
   s.fx[i]={type:ty,v:[0,1,2,3].map(()=>Math.round(clamp(64+(r()*127-64)*amtK,0,127))),mix:Math.round(127*(.45+.55*r())),on:1}}
  s.fxSel=0;
  s.mod.forEach(m=>m.routes.forEach((x,i)=>{if(x.dest.startsWith('FX'))m.routes[i]={dest:'—',amt:0}}));
@@ -579,8 +623,8 @@ function doRandom(kind){
  const what=kind==='FX'?scrambleFx(s,r):randEngine(s,r),name=kind==='FX'?'SCRAMBLE':'RANDOMIZE';
  S.msg={t:`${name} #${S.dice} · HOLD SEL = UNDO`,until:now+4000,act:'undo'};
  log(`${name} #${S.dice}: ${what}`,kind==='FX'
-  ?`A new random chain with LFOs patched into its parameters, CHAOS ${S.chaos}%. SEL again re-rolls; hold SEL (or tap the banner, or Backspace) to undo all rolls. Print it and the result lives in the recipe.`
-  :`Random engine settings, CHAOS ${S.chaos}% (GLO). SEL again re-rolls; hold SEL (or tap the banner, or Backspace) to undo. Print it and the result lives in the recipe.`,'rnd'+kind);
+  ?`A new random chain with LFOs patched into its parameters, CHAOS ${S.chaos}%. SEL again re-rolls; hold SEL (or tap the banner, or Backspace) to undo all rolls. Resample it and the result lives in the recipe.`
+  :`Random engine settings, CHAOS ${S.chaos}% (GLO). SEL again re-rolls; hold SEL (or tap the banner, or Backspace) to undo. Resample it and the result lives in the recipe.`,'rnd'+kind);
  render();
 }
 function undoRandom(){
@@ -591,11 +635,11 @@ function bankDo(act){
  const s=snd(),tr=tree(s),g=tr[s.genSel].g;
  if(act==='LOAD'){
   if(g.audio){s.cur=g.id;s.input=g.id;if(isSynth(s))s.src='SAMP'}else{s.cur=0;s.input=null;s.src='OP4'}
-  flash('LOADED G'+g.id);log('LOAD G'+g.id,g.audio?`G${g.id} audio is now the source (${s.src}). The next print will be a child of G${g.id}.`:'G0 has no audio. You start from a clean OP4.');
+  flash('LOADED G'+g.id);log('LOAD G'+g.id,g.audio?`G${g.id} audio is now the source (${s.src}). The next resample will be a child of G${g.id}.`:'G0 has no audio. You start from a clean OP4.');
  }else if(act==='EDIT'){
   if(!g.recipe){flash('G0 HAS NO RECIPE');log('EDIT G0','G0 to punkt startowy, nie ma przepisu.');render();return}
   Object.assign(s,clone(g.recipe));s.cur=g.parent;const pg=gById(s,g.parent);s.input=pg&&pg.audio?pg.id:null;
-  flash('EDIT G'+g.id+' → NEW BRANCH');log('EDIT G'+g.id,`Loaded the recipe that made G${g.id}: ${g.label}. Change something and print to start a new branch next to G${g.id}. G${g.id} stays.`);
+  flash('EDIT G'+g.id+' → NEW BRANCH');log('EDIT G'+g.id,`Loaded the recipe that made G${g.id}: ${g.label}. Change something and resample to start a new branch next to G${g.id}. G${g.id} stays.`);
  }else{
   const path=[];let x=g;while(x){path.unshift(x.id);x=gById(s,x.parent)}
   S.rebuilding={s,path,t:performance.now(),dur:450*path.length};
@@ -615,7 +659,7 @@ function screenAct(a){
   case 'voice':s.drum.voice=n;log('VOICE '+DRV[n][0],'The knobs now shape this drum voice.');break;
   case 'slice':s.chop.slice=n;log('SLICE '+(n+1),'Slice to edit.');break;
   case 'do':S.bankDo=n;bankDo(['LOAD','EDIT','RBLD'][n]);return;
-  case 'print':doPrint();return;
+  case 'resample':doResample();return;
   case 'undo':undoRandom();return;
   case 'learn':S.learn={mod:s.modSel,i:n};log(`LEARN ${modShort(s.modSel)} → dest ${n+1}`,'Turn the knob of any parameter on any page. SEL cancels.');break;
   case 'src':s.src=SRCS[(SRCS.indexOf(s.src)+1)%SRCS.length];log('SRC → '+s.src,WHY.SRC);break;
@@ -653,7 +697,7 @@ function visOP4(s){
    <svg width="100" height="30">${adsr(o,100,30)}</svg></div></div>`;
 }
 function waveBox(s,overlay,info){
- if(s.input==null)return`<div class="empty">NO PRINT<small>PRINT FROM OP4 OR ANLG FIRST</small></div>`;
+ if(s.input==null)return`<div class="empty">NO RESAMPLE<small>RESAMPLE FROM OP4 OR ANLG FIRST</small></div>`;
  const g=gById(s,s.input),w=wave(g.seed);
  return`<svg width="220" height="100"><path d="${wpath(w.a,220,100)}" fill="currentColor"/>${overlay}</svg>
   <div class="t14" style="margin-top:8px;display:flex;justify-content:space-between"><span>G${g.id} · ${(.8+(g.seed%37)/10).toFixed(1)}s</span><span>${info}</span></div>`;
@@ -720,7 +764,7 @@ function visPlay(s,now){
  const c=p.steps[p.sel],ns=[...c.notes].sort((a,b)=>a-b);
  return`${chordTimeline(s,now)}
   <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:5px"><span class="t30">${chordName(c)}</span><span class="t14">STEP ${p.sel+1} · ${LENN[c.lenI]} · ${c.gate}%</span></div>
-  <div class="t14" style="margin-top:3px;white-space:nowrap;overflow:hidden">${ns.length?ns.map(noteName).join(' '):'—'}</div>
+  <div class="t14" style="margin-top:3px;white-space:nowrap;overflow:hidden">${c.bass!=null?'<b>'+noteName(c.bass)+'</b> | ':''}${ns.length?ns.map(noteName).join(' '):'—'}</div>
   <div style="margin-top:4px">${strumSvg(p,c.notes,p.sel)}</div>`;
 }
 function lfoVal(w,x){switch(w){case 0:return Math.sin(2*Math.PI*x);case 1:return x<.5?-1+4*x:3-4*x;case 2:return x<.5?1:-1;case 3:return 1-2*x;case 4:return 2*x-1;
@@ -734,6 +778,10 @@ function visMod(s,now){
   const hz=m.sync?(S.bpm/60)/DIVB[Math.round(m.rate/127*8)]:lfoHz(m.rate),ph=((now/1000)*Math.min(hz,3)+m.phase/127)%1;
   g=`<polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="${ph*220}" cy="${10-lfoVal(m.wave,ph)*8}" r="4.5" fill="var(--soft)" stroke="currentColor" stroke-width="2"/>`;
   desc=`${LFOW[m.wave]} · ${m.sync?DIVS[Math.round(m.rate/127*8)]:lfoHz(m.rate).toFixed(2)+'Hz'} · ${TRIGS[m.trig]}`;
+ }else if(m.kind==='S'){let pts='';const a=.01+m.atk/127*.2,rl=.03+m.rel/127*.6,gn=.4+m.gain/127*.6;
+  for(let i=0;i<=110;i++){const x=(i/110*4)%1,e=x<a?x/a:Math.exp(-(x-a)/rl*2);pts+=`${(i*2).toFixed(1)},${(19-e*gn*17).toFixed(1)} `}
+  g=`<polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2.5"/>`;
+  const ks=S.bank[S.tracks[m.key]];desc=`FOLLOWS T${m.key+1} · ${ks?ks.name:''}${S.mute[m.key]?' · MUTED, STILL KEYS':''}`;
  }else{g=adsr(m,220,20);desc=`ADSR · ${ELOOP[m.loop]}`}
  const rts=m.routes.map((r,i)=>{const w=Math.abs(r.amt)/64*30,x=r.amt<0?30-w:30;
   return`<div data-a="learn:${i}" class="rt${i===L?' sel':''}"><b>${i+1}</b><span class="dn">${i===L?'TURN A KNOB…':r.dest}</span>
@@ -786,6 +834,13 @@ function visAnlg(s){
    <line x1="${fc*220}" y1="0" x2="${fc*220}" y2="46" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3"/></svg>
   <div class="t12" style="margin-top:4px">LP24 · CUT ${o.cut} · RES ${o.res} · ENV ${sgn(o.env-64)}</div>`;
 }
+/* the 4 tracks: which are muted, and who keys whom (DUCK / GATE / VOCODER slots and SC sources) */
+function keyLinks(){const out=[];S.tracks.forEach((b,t)=>{const s=S.bank[b];
+  s.fx.forEach(f=>{const n=FX[f.type][0];if(f.type&&f.on&&KEYED.has(n)){const k=keyName(n,f.v[0]);if(k!=='SELF')out.push({from:+k.slice(1)-1,to:t,what:FX[f.type][1]})}});
+  const sc=s.mod[9];if(sc&&liveM(sc))out.push({from:sc.key,to:t,what:'SC'})});return out}
+function visTracks(){const L=keyLinks();
+ return`<div class="t12" style="margin-bottom:4px">TRACKS · K1–K4 MUTE · A MUTED TRACK STILL KEYS</div>${S.tracks.map((b,t)=>{const s=S.bank[b],k=L.filter(x=>x.to===t).map(x=>'T'+(x.from+1)+' '+x.what);
+  return`<div class="r${t===S.tr?' sel':''}" style="display:flex;justify-content:space-between;gap:6px"><span>T${t+1} ${S.mute[t]?'<s>'+s.name+'</s>':s.name}</span><span class="t12">${S.mute[t]?'MUTE':''}${k.length?' ← '+k.join(', '):''}</span></div>`}).join('')}`}
 function visFx(s){
  const f=s.fx[s.fxSel];
  const chips=s.fx.map((x,i)=>`<div data-a="fx:${i}" class="chip${i===s.fxSel?' sel':''}${x.type&&x.on?' on':''}" style="${x.type&&!x.on?'opacity:.4':''}">${FX[x.type][1]}</div>`).join('');
@@ -793,19 +848,20 @@ function visFx(s){
  return`<div class="chips">${chips}</div>
   <div class="t12" style="margin-top:4px">SLOT ${s.fxSel+1}/8</div>
   <div class="t30" style="margin-top:4px">${f.type?FX[f.type][0]:'EMPTY'}</div>
-  <div class="t14" style="margin-top:6px">${f.type?`MIX ${Math.round(f.mix/127*100)}% · ${f.on?'ON':'BYPASS'}`:'ROW 2 → TYPE · SEL = SCRAMBLE'}</div>
-  <div class="t12" style="margin-top:10px;white-space:nowrap;overflow:hidden">IN → ${chain.length?chain.join(' → '):'(empty)'} → OUT</div>`;
+  <div class="t14" style="margin-top:6px">${f.type?`MIX ${Math.round(f.mix/127*100)}% · ${f.on?'ON':'BYPASS'}${KEYED.has(FX[f.type][0])?' · KEY '+keyName(FX[f.type][0],f.v[0])+(S.mute[keyName(FX[f.type][0],f.v[0]).slice(1)-1]?' MUTED':''):''}`:'ROW 2 → TYPE · SEL = SCRAMBLE'}</div>
+  ${f.type&&FXD[FX[f.type][0]]?`<div class="t12" style="margin-top:6px;line-height:1.2;max-height:2.4em;overflow:hidden">${FXD[FX[f.type][0]]}</div>`
+   :`<div class="t12" style="margin-top:10px;white-space:nowrap;overflow:hidden">IN → ${chain.length?chain.join(' → '):'(empty)'} → OUT</div>`}`;
 }
-function visPrint(s,now){
- const P_=S.printing;
+function visResample(s,now){
+ const P_=S.resampling;
  if(P_&&P_.s===s){const k=clamp((now-P_.t)/P_.dur,0,1),w=wave(P_.seed);
-  return`<div class="t30">PRINTING</div><div class="t14" style="margin:4px 0 8px">${['NOTE+TAIL','1 BAR','2 BAR','4 BAR'][s.print.len]} · ${['GRID','FREE'][s.print.start]} → G${P_.id}</div>
+  return`<div class="t30">RESAMPLING</div><div class="t14" style="margin:4px 0 8px">${['NOTE+TAIL','1 BAR','2 BAR','4 BAR'][s.resample.len]} · ${['GRID','FREE'][s.resample.start]} → G${P_.id}</div>
    <div class="bar"><div style="width:${(k*100).toFixed(1)}%"></div></div>
    <svg width="220" height="56" style="margin-top:8px"><path d="${wpath(w.a,220,56,k)}" fill="currentColor"/></svg>`}
  return`<div style="display:flex;gap:12px;align-items:center;height:100%">
-  <div class="recb" data-a="print" style="cursor:pointer"><i>●</i>PRINT</div>
+  <div class="recb" data-a="resample" style="cursor:pointer"><i>●</i>RESAMPLE</div>
   <div style="flex:1;min-width:0"><div class="t14">Z G${s.cur}</div><div class="t30">→ G${s.nextG}</div>
-   <div class="t12" style="margin-top:6px">${summary(s)}</div><div class="t12" style="margin-top:4px">${['FLAT','KEEP'][s.print.after]} · ${['PCM','ADPCM'][s.print.fmt]}</div></div></div>`;
+   <div class="t12" style="margin-top:6px">${summary(s)}</div><div class="t12" style="margin-top:4px">${['FLAT','KEEP'][s.resample.after]} · ${['PCM','ADPCM'][s.resample.fmt]}</div></div></div>`;
 }
 function visBank(s,now){
  const R=S.rebuilding;
@@ -828,12 +884,13 @@ function render(){
   case 'PLAY':title=PMODES[s.play.mode];vis=visPlay(s,now);break;
   case 'MOD':vis=visMod(s,now);break;
   case 'FX':vis=visFx(s);break;
-  case 'PRINT':vis=visPrint(s,now);break;
+  case 'RESAMPLE':vis=visResample(s,now);break;
   case 'BANK':vis=visBank(s,now);break;
-  case 'GLO':vis=`<div class="t54" style="margin-top:6px">${S.bpm}</div><div class="t20">BPM · SWING ${S.swing}%</div>
+  case 'GLO':if(curRow(s)===2){vis=visTracks();break}
+   vis=`<div class="t54" style="margin-top:6px">${S.bpm}</div><div class="t20">BPM · SWING ${S.swing}%</div>
    <div class="t20" style="margin-top:14px">${NOTES[S.root]} ${SCALES[S.scale]}</div><div class="t14">OCT ${sgn(S.oct)} · VOL ${S.vol} · CHAOS ${S.chaos}%</div>`;break;
  }
- if(S.printing&&S.page!=='PRINT')vis+=`<div class="msg">● PRINTING → G${S.printing.id}</div>`;
+ if(S.resampling&&S.page!=='RESAMPLE')vis+=`<div class="msg">● RESAMPLING → G${S.resampling.id}</div>`;
  else if(S.learn&&S.page!=='MOD')vis+=`<div class="msg">LEARN ${modShort(S.learn.mod)} · DEST ${S.learn.i+1}: TURN A KNOB</div>`;
  else if(S.msg)vis+=`<div class="msg"${S.msg.act?` data-a="${S.msg.act}" style="cursor:pointer"`:''}>${S.msg.t}</div>`;
  $('#scr').innerHTML=hdr(title,s)+`<div class="vis">${vis}</div>`+prm(s);
@@ -864,17 +921,17 @@ const LAYOUTS={
   enc:{MASTER:kn(60,340),SELECT:kn(160,340),ALGORITHM:kn(260,340),PRESETS:kn(360,340),K1:kn(60,416),K2:kn(160,416),K3:kn(260,416),K4:kn(360,416)},
   ctl:{...buttonRows([[...ROWS[0],'OCT-'],[...ROWS[1],'OCT+']],25,462,46,54,58),...keybed(16,598,388,20,76,20,72,6)}}
 };
-/* what each FM-1 button does in veffbox */
-const BTN_SUB={FX:'FX',SEL:'OK/LRN',ENV:'ENV',LFO:'LFO',EDIT:'SRC',GLO:'GLO',HOME:'PRINT',SAVE:'BANK',ARP:'STRUM',SEQ:'STEP',PLAY:'▶ ■',REC:'● PRINT','OCT-':'','OCT+':''};
-const PAGE_BTN={SRC:'EDIT',PLAY:'ARP (strum) · SEQ (steps)',MOD:'LFO · ENV',FX:'FX',PRINT:'HOME (settings) · REC (print)',BANK:'SAVE',GLO:'GLO'};
+/* what each FM-1 button does in Veffbox */
+const BTN_SUB={FX:'FX',SEL:'OK/LRN',ENV:'ENV',LFO:'LFO',EDIT:'SRC',GLO:'GLO',HOME:'RESAMPLE',SAVE:'BANK',ARP:'STRUM',SEQ:'STEP',PLAY:'▶ ■',REC:'● RESAMPLE','OCT-':'','OCT+':''};
+const PAGE_BTN={SRC:'EDIT',PLAY:'ARP (strum) · SEQ (steps)',MOD:'LFO · ENV',FX:'FX',RESAMPLE:'HOME (settings) · REC (resample)',BANK:'SAVE',GLO:'GLO'};
 function btnOn(id){
  const s=snd();
  switch(id){
   case 'FX':return S.page==='FX';case 'EDIT':return S.page==='SRC';case 'GLO':return S.page==='GLO';
-  case 'HOME':return S.page==='PRINT';case 'SAVE':return S.page==='BANK';
+  case 'HOME':return S.page==='RESAMPLE';case 'SAVE':return S.page==='BANK';
   case 'LFO':return S.page==='MOD'&&s.modSel<6;case 'ENV':return S.page==='MOD'&&s.modSel>=6;
   case 'ARP':return S.page==='PLAY'&&curRow(s)===0;case 'SEQ':return S.page==='PLAY'&&curRow(s)>0;
-  case 'PLAY':return S.playing;case 'REC':return!!S.printing;
+  case 'PLAY':return S.playing;case 'REC':return!!S.resampling;
  }
  return false;
 }
@@ -893,11 +950,11 @@ function gotoMod(env){
 function pressBtn(id){
  switch(id){
   case 'FX':return pressPage('FX');case 'EDIT':return pressPage('SRC');case 'GLO':return pressPage('GLO');
-  case 'HOME':return pressPage('PRINT');case 'SAVE':return pressPage('BANK');
+  case 'HOME':return pressPage('RESAMPLE');case 'SAVE':return pressPage('BANK');
   case 'LFO':return gotoMod(false);case 'ENV':return gotoMod(true);
   case 'ARP':return gotoPlay(0);case 'SEQ':return gotoPlay(1);
-  case 'SEL':{const before=S.log.length;selPress();if(S.log.length===before&&S.page!=='PRINT'&&S.page!=='BANK')log('SEL','SEL acts on the page: SRC randomize, FX scramble, MOD learn, PRINT print, BANK runs DO, SEQ toggles a step.');return}
-  case 'PLAY':return togglePlay();case 'REC':return doPrint();
+  case 'SEL':{const before=S.log.length;selPress();if(S.log.length===before&&S.page!=='RESAMPLE'&&S.page!=='BANK')log('SEL','SEL acts on the page: SRC randomize, FX scramble, MOD learn, RESAMPLE resample, BANK runs DO, SEQ toggles a step.');return}
+  case 'PLAY':return togglePlay();case 'REC':return doResample();
   case 'OCT-':case 'OCT+':S.oct=clamp(S.oct+(id==='OCT+'?1:-1),-2,2);log(`OCT ${sgn(S.oct)}`,'Shifts the keys by an octave.');flash(`OCT ${sgn(S.oct)}`);render();return;
  }
 }
@@ -910,9 +967,9 @@ function noteOn(n){
  }else if(S.page==='PLAY'&&p.mode===2){
   const c=p.steps[p.sel],i=c.notes.indexOf(midi);let did;
   if(i>=0){c.notes.splice(i,1);did='− '+noteName(midi)}
-  else if(c.notes.length<6){c.notes.push(midi);did='+ '+noteName(midi)}
-  else did='MAX 6 NOTES';
-  what=`STEP ${p.sel+1}: ${did} → ${chordName(c)}`;why='PLAY in CHORD mode: a key adds or removes an exact note in the selected step (up to 6). The chord name is recognized automatically. TYPE fills the step from a template, ROOT moves the whole voicing.';
+  else if(c.notes.length<8){c.notes.push(midi);did='+ '+noteName(midi)}
+  else did='MAX 8 NOTES';
+  what=`STEP ${p.sel+1}: ${did} → ${chordName(c)}`;why='PLAY in CHORD mode: a key adds or removes an exact note in the selected step (up to 8, plus a separate BASS note on row 3). The chord name is recognized automatically. TYPE fills the step from a template, ROOT moves the whole voicing.';
  }else if(S.page==='PLAY'&&p.mode===1){
   const c=p.seq[p.sel];c.note=midi;c.on=1;what=`STEP ${p.sel+1} = ${noteName(midi)}`;p.sel=(p.sel+1)%p.len;
   why='PLAY in SEQ mode: a key writes the note and moves to the next step (step record).';
@@ -934,7 +991,7 @@ function build(){
   LAY=L;const dev=$('#dev'),scr=document.getElementById('scr')||Object.assign(document.createElement('div'),{id:'scr'});
   dev.innerHTML='';dev.style.width=L.W+'px';dev.style.height=L.H+'px';
   for(const[k,b]of Object.entries(L.deco)){const d=document.createElement('div');d.className=k==='bezel'?'bezel':'tray';place(d,b);dev.append(d)}
-  const br=document.createElement('div');br.className='brand';br.textContent='veffbox';br.style.left=L.brand[0]+'px';br.style.top=L.brand[1]+'px';dev.append(br);
+  const br=document.createElement('div');br.className='brand';br.textContent='Veffbox';br.style.left=L.brand[0]+'px';br.style.top=L.brand[1]+'px';dev.append(br);
   place(scr,L.lcd);dev.append(scr);
   for(const[k,b]of Object.entries(L.enc)){
    const el=document.createElement('div');el.className='knob'+(k[0]==='K'?' edit':'');el.dataset.enc=k;place(el,b);
@@ -962,7 +1019,7 @@ function syncPanel(){
    if(!LAY.lblAbove)lbl=k==='MASTER'?'VOL':k==='SELECT'?'SELECT':k==='ALGORITHM'?'TRK '+(S.tr+1):'SOUND'}
   b.textContent=lbl;i.style.transform=`rotate(${a}deg)`;
  });
- const selSub={SRC:'RANDOM',FX:'SCRAMBLE',MOD:'LEARN',PRINT:'PRINT',BANK:'DO'}[S.page]||(S.page==='PLAY'&&s.play.mode===1?'STEP':'OK');
+ const selSub={SRC:'RANDOM',FX:'SCRAMBLE',MOD:'LEARN',RESAMPLE:'RESAMPLE',BANK:'DO'}[S.page]||(S.page==='PLAY'&&s.play.mode===1?'STEP':'OK');
  document.querySelectorAll('[data-btn]').forEach(el=>{const id=el.dataset.btn;el.classList.toggle('on',btnOn(id));el.querySelector('small').textContent=id==='SEL'?selSub:(BTN_SUB[id]||'')});
  document.querySelectorAll('[data-key]').forEach(el=>el.classList.toggle('down',S.down.has(+el.dataset.key)));
 }
@@ -971,7 +1028,7 @@ function syncPanel(){
 function drawFlow(){
  const s=snd(),cx=150,W=150,H=46,ys=[16,84,152,220,288];
  const sub={SRC:'EDIT · '+s.src+(s.input!=null?' ← G'+s.input:''),PLAY:'ARP/SEQ · '+PMODES[s.play.mode]+(s.play.mode===2?' '+STRUMS[s.play.strum]:''),
-  MOD:'LFO/ENV · '+s.mod.filter(liveM).length+' src · '+s.mod.reduce((a,m)=>a+m.routes.filter(liveR).length,0)+' dests',FX:'FX · '+s.fx.filter(f=>f.type&&f.on).length+'/8 slots',PRINT:'HOME/REC · → G'+s.nextG,BANK:'SAVE · '+s.gens.length+' gens'};
+  MOD:'LFO/ENV · '+s.mod.filter(liveM).length+' src · '+s.mod.reduce((a,m)=>a+m.routes.filter(liveR).length,0)+' dests',FX:'FX · '+s.fx.filter(f=>f.type&&f.on).length+'/8 slots',RESAMPLE:'HOME/REC · → G'+s.nextG,BANK:'SAVE · '+s.gens.length+' gens'};
  let g=`<defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>`;
  const node=(pg,x,y,w)=>{const on=S.page===pg;
   return`<g class="n" data-p="${pg}"><rect x="${x}" y="${y}" width="${w}" height="${H}" rx="12" fill="${on?'var(--ink)':'var(--bg)'}" stroke="var(--ink)" stroke-width="2.5"/>
@@ -979,12 +1036,12 @@ function drawFlow(){
    <text x="${x+w/2}" y="${y+38}" text-anchor="middle" font-size="11.5" fill="${on?'var(--soft)':'var(--ink)'}" opacity=".85">${sub[pg]}</text></g>`};
  ['SRC','PLAY','MOD','FX'].forEach((pg,i)=>{g+=`<line x1="${cx}" y1="${ys[i]+H}" x2="${cx}" y2="${ys[i+1]-2}" stroke="var(--ink)" stroke-width="2.5" marker-end="url(#ar)"/>`});
  g+=`<path d="M${cx-W/2} ${ys[4]+H/2} H28 V${ys[0]+H/2} H${cx-W/2-2}" fill="none" stroke="var(--ink)" stroke-width="2.5" marker-end="url(#ar)"/>
-  <text x="18" y="${(ys[0]+ys[4])/2+H/2}" font-size="12" font-weight="700" transform="rotate(-90 18 ${(ys[0]+ys[4])/2+H/2})" text-anchor="middle">PRINT = NEW SOURCE</text>`;
+  <text x="18" y="${(ys[0]+ys[4])/2+H/2}" font-size="12" font-weight="700" transform="rotate(-90 18 ${(ys[0]+ys[4])/2+H/2})" text-anchor="middle">RESAMPLE = NEW SOURCE</text>`;
  g+=`<line x1="${cx+W/2}" y1="${ys[4]+H/2}" x2="${cx+W/2+22}" y2="${ys[4]+H/2}" stroke="var(--ink)" stroke-width="2.5"/><path d="M${cx+W/2+22} ${ys[4]+H/2} V${ys[4]+H+42}" fill="none" stroke="var(--ink)" stroke-width="2.5" marker-end="url(#ar)"/>
   <text x="${cx+W/2+28}" y="${ys[4]+H+20}" font-size="11" font-weight="700">G+1</text>`;
  g+=`<path d="M${cx+W/2+60} ${ys[4]+H+42} V${ys[0]+H/2} H${cx+W/2+2}" fill="none" stroke="var(--ink)" stroke-width="2.5" stroke-dasharray="5 4" marker-end="url(#ar)"/>
   <text x="${cx+W/2+66}" y="${(ys[0]+ys[4])/2+30}" font-size="12" font-weight="700" transform="rotate(90 ${cx+W/2+66} ${(ys[0]+ys[4])/2+30})" text-anchor="middle">LOAD / EDIT</text>`;
- ['SRC','PLAY','MOD','FX','PRINT'].forEach((pg,i)=>g+=node(pg,cx-W/2,ys[i],W));
+ ['SRC','PLAY','MOD','FX','RESAMPLE'].forEach((pg,i)=>g+=node(pg,cx-W/2,ys[i],W));
  g+=node('BANK',cx+W/2-40,ys[4]+H+44,120);
  $('#flow').innerHTML=g;
 }
@@ -998,7 +1055,7 @@ function drawNow(){
   ${S.page==='SRC'?'<li><b>SEL = RANDOMIZE</b>random engine settings; CHAOS on GLO sets how far; hold SEL = undo</li>':''}
   ${S.page==='FX'?'<li><b>SEL = SCRAMBLE</b>random wild chain with LFOs patched in; again = re-roll; hold SEL = undo</li>':''}
   ${S.page==='MOD'?'<li><b>SEL = LEARN</b>then turn any parameter knob on any page and it becomes a destination</li>':''}
-  <li><b>REC</b>print from any page</li><li><b>ALGORITHM · PRESETS</b>track · bank sound</li></ul>`;
+  <li><b>REC</b>resample from any page</li><li><b>ALGORITHM · PRESETS</b>track · bank sound</li></ul>`;
 }
 
 /* ───────── input ───────── */
@@ -1054,11 +1111,11 @@ addEventListener('keyup',e=>{if(e.code in PIANO)noteOff(PIANO[e.code]);if(e.code
 
 /* ───────── animation loop ───────── */
 function loop(now){
- if(S.printing&&now-S.printing.t>=S.printing.dur){const s=S.printing.s,g=finishPrint(s);S.printing=null;flash('G'+g.id+' SAVED');
+ if(S.resampling&&now-S.resampling.t>=S.resampling.dur){const s=S.resampling.s,g=finishResample(s);S.resampling=null;flash('G'+g.id+' SAVED');
   log('G'+g.id+' saved',`Audio and recipe are in the bank. Source: ${s.src} ← G${g.id}. Keep editing on this material.`);render()}
  if(S.rebuilding&&now-S.rebuilding.t>=S.rebuilding.dur){const id=S.rebuilding.path.at(-1);S.rebuilding=null;flash('G'+id+' REBUILT · BIT-EXACT');render()}
  const s=snd();
- if(S.playing||S.printing||S.rebuilding||S.msg||S.page==='MOD'||(S.page==='SRC'&&s.src==='GRAN'))render();
+ if(S.playing||S.resampling||S.rebuilding||S.msg||S.page==='MOD'||(S.page==='SRC'&&s.src==='GRAN'))render();
  requestAnimationFrame(loop);
 }
 

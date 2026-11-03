@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: CHOP, a transient slicer over the print (the buffer of vb_samp_buffer(): 22.05 kHz, 16-bit mono).
+/* Veffbox core: CHOP, a transient slicer over the print (the buffer of vb_samp_buffer(): 22.05 kHz, 16-bit mono).
  *
  * Slices: energy-flux onset detection over blocks of 256 samples (mean |x| per block, positive block-to-block rise,
  * peak-picked, at least 3 blocks apart, each onset then refined to the first sample over a quarter of the hit's peak,

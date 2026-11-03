@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: ANLG, a two-oscillator analog-style voice (vb_engine_t).
+/* Veffbox core: ANLG, a two-oscillator analog-style voice (vb_engine_t).
  *
  * Patch: 16 bytes: OSC1 OSC2 DET MIX / SUB NOIS SYNC PW / CUT RES ENV DRV / ATK DEC SUS REL.
  *   OSC1, OSC2  SAW SQR TRI PWM SIN NOIS (SAW and the pulses are polyBLEP band-limited; PWM = PW + a slow internal sweep)

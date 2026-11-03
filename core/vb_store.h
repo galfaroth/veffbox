@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: what goes into flash. A sound is one 4 KiB sector: its current recipe and its generations, each
+/* Veffbox core: what goes into flash. A sound is one 4 KiB sector: its current recipe and its generations, each
  * generation stored as the bytes that differ from the current recipe. A print's audio is stored as 4-bit IMA ADPCM.
  * Pure functions on RAM buffers: the firmware erases and writes the sectors (fw/vb_app.c). */
 #ifndef VB_STORE_H

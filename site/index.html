@@ -1,20 +1,20 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only
-     veffbox: 2026 Veff -->
+     Veffbox: 2026 Veff -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>veffbox: resampling sound design for the M-VAVE FM-1</title>
-<meta name="description" content="veffbox is open-source firmware for the M-VAVE FM-1. Build one sound from a source, a strummed chord sequence, 9 modulators and an 8-slot FX chain, then RESAMPLE it: the resample becomes the next sound, and its recipe rebuilds it bit for bit.">
+<title>Veffbox: resampling sound design for the M-VAVE FM-1</title>
+<meta name="description" content="Veffbox is open-source firmware for the M-VAVE FM-1. Build one sound from a source, a strummed chord sequence, 9 modulators and an 8-slot FX chain, then RESAMPLE it: the resample becomes the next sound, and its recipe rebuilds it bit for bit.">
 <meta name="theme-color" content="#f4d9ea">
 <meta name="color-scheme" content="light">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="veffbox">
-<meta property="og:title" content="veffbox: one sound. Resample it. Make it the next sound.">
+<meta property="og:site_name" content="Veffbox">
+<meta property="og:title" content="Veffbox: one sound. Resample it. Make it the next sound.">
 <meta property="og:description" content="Resampling sound-design firmware for the M-VAVE FM-1: six sources, strummed chords, 9 modulators, an 8-slot FX chain, and a generation tree that rebuilds every resample bit-exactly.">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="veffbox: one sound. Resample it. Make it the next sound.">
+<meta name="twitter:title" content="Veffbox: one sound. Resample it. Make it the next sound.">
 <meta name="twitter:description" content="Resampling sound-design firmware for the M-VAVE FM-1. Open source, GPL-3.0.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23f4d9ea'/%3E%3Ccircle cx='32' cy='32' r='19' fill='%231d0819'/%3E%3Crect x='29' y='15' width='6' height='15' rx='3' fill='%23e07fb5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -78,7 +78,7 @@ p+p{margin-top:.8em}
 .hero::before{content:'';position:absolute;inset:-64px 0 auto 0;height:720px;background:radial-gradient(60% 70% at 85% 10%,#e07fb540,transparent 70%),radial-gradient(40% 50% at 0% 40%,#f4d9ea,transparent 70%);z-index:-1;pointer-events:none}
 .hero .kicker{margin-bottom:22px}
 .hero h1{max-width:12ch}
-.hero h1.cycle{max-width:18ch;font-size:clamp(38px,7.2vw,92px)}
+.hero h1.cycle{max-width:13ch}
 .hero .lead{margin-top:28px}
 .ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
 .btn{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 24px;border-radius:999px;background:var(--ink);color:var(--bg);font-weight:700;font-size:17px;text-decoration:none;border:0;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 #000}
@@ -343,7 +343,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
 
 <header class="nav">
   <div class="wrap">
-    <a class="mark" href="#top" aria-label="veffbox, top of the page"><i aria-hidden="true"></i>veffbox</a>
+    <a class="mark" href="#top" aria-label="Veffbox, top of the page"><i aria-hidden="true"></i>Veffbox</a>
     <nav aria-label="Sections">
       <a href="#guide">Start</a>
       <a class="hide-s" href="#loop">Loop</a>
@@ -360,10 +360,8 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
 <section class="hero">
   <div class="wrap">
     <p class="kicker">Firmware for the M-VAVE FM&#8209;1 · open source · early</p>
-    <h1 class="cycle">Make a sound <i aria-hidden="true">›</i> <span class="hl">resample</span> <i aria-hidden="true">›</i>
-      make it something new <i aria-hidden="true">›</i> <span class="hl">resample</span> <i aria-hidden="true">›</i>
-      <span style="white-space:nowrap">repeat forever<span class="loop-mark" aria-hidden="true">↻</span></span></h1>
-    <p class="lead">veffbox is a resampling sound-design instrument for a 27-key pocket synth. Build <b>one sound</b> from a
+    <h1 class="cycle">Make a sound. <span class="hl">Resample&nbsp;it.</span> Make it new.<span class="loop-mark" aria-hidden="true">↻</span></h1>
+    <p class="lead">Veffbox is a resampling sound-design instrument for a 27-key pocket synth. Build <b>one sound</b> from a
       source, a strummed chord sequence, modulation and up to eight effects. Then <b>RESAMPLE</b>: the recording becomes the
       new source, and the recipe that made it is kept, so every sound can be <b>rebuilt bit for bit</b>.</p>
     <div class="ctas">
@@ -386,11 +384,11 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <p class="kicker" style="margin-bottom:10px">Interactive · no audio yet</p>
         <h3 id="try-title">This is the interface. Click it.</h3>
       </div>
-      <p>The FM&#8209;1 panel as veffbox lays it out: 240×240 screen, 7 encoders, 14 buttons, 27 keys. Drag the knobs, press
+      <p>The FM&#8209;1 panel as Veffbox lays it out: 240×240 screen, 7 encoders, 14 buttons, 27 keys. Drag the knobs, press
         <kbd>SEL</kbd> on <kbd>EDIT</kbd> to randomize, <kbd>REC</kbd> to resample. The panel below it explains every click.</p>
     </div>
     <div class="frame">
-      <iframe id="demo" src="demo/index.html#t4/SRC" title="veffbox interface mockup: the FM-1 panel" loading="eager"></iframe>
+      <iframe id="demo" src="demo/index.html#t4/SRC" title="Veffbox interface mockup: the FM-1 panel" loading="eager"></iframe>
     </div>
     <div class="frame-bar">
       <span>Computer keyboard: <kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> <kbd>D</kbd> <kbd>C</kbd>… play the keys, <kbd>Space</kbd> PLAY, <kbd>Enter</kbd> resample, <kbd>\</kbd> SEL (click the panel first).</span>
@@ -448,7 +446,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
           saves itself to the FM&#8209;1's flash 2.5&nbsp;s after you stop playing. To fill the bank, turn PRESETS to an
           empty sound and start again from step 1.</p></li>
     </ol>
-    <p class="note">Why the tree can always be rebuilt: veffbox uses integer math only, and every random roll comes from a
+    <p class="note">Why the tree can always be rebuilt: Veffbox uses integer math only, and every random roll comes from a
       seed stored in the recipe. A recipe is a few hundred bytes, so a sound keeps up to 12 generations in flash, while
       audio is kept only for the last resample. REBUILD renders the rest from their recipes and gets the same bits back.</p>
   </div>
@@ -854,11 +852,11 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     <div class="s-head">
       <span class="num">09 · Panel map</span>
       <h2 id="panel-title">Every control, one job.</h2>
-      <p class="lead">The FM&#8209;1's labels stay; veffbox gives them these meanings. The four knobs under the screen always
+      <p class="lead">The FM&#8209;1's labels stay; Veffbox gives them these meanings. The four knobs under the screen always
         edit the lit row of the current page.</p>
     </div>
     <table class="map">
-      <thead><tr><th>FM&#8209;1 control</th><th>veffbox</th><th>Details</th></tr></thead>
+      <thead><tr><th>FM&#8209;1 control</th><th>Veffbox</th><th>Details</th></tr></thead>
       <tbody>
         <tr><td><span class="k">EDIT</span></td><td>SRC: the source</td><td>SELECT picks the engine or resample source; the keys pick the DRUM voice. SEL = RANDOMIZE.</td></tr>
         <tr><td><span class="k">ARP</span><span class="k">SEQ</span></td><td>PLAY</td><td>ARP: mode and strum row. SEQ: the step row (chord or note of the selected step).</td></tr>
@@ -894,7 +892,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     </div>
     <div class="status-grid">
       <div class="card now-card">
-        <span class="tag">Firmware 0.2.1</span>
+        <span class="tag">Firmware 0.2.2</span>
         <h3 style="margin-top:16px">Running on hardware today</h3>
         <p>Measured on a real FM&#8209;1: a strummed OP4 chord sequence through a scrambled FX chain peaks at 45% CPU,
           with no late audio buffers.</p>
@@ -926,14 +924,14 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     <div class="s-head">
       <span class="num">11 · Install</span>
       <h2 id="install-title">Put it on your FM&#8209;1.</h2>
-      <p class="lead">Over the FM&#8209;1's own USB cable. The update path is the same as MNM-1's, so a veffbox image can always
+      <p class="lead">Over the FM&#8209;1's own USB cable. The update path is the same as MNM-1's, so a Veffbox image can always
         be replaced with the normal installer.</p>
     </div>
     <div class="inst">
       <div class="card">
         <span class="tag soft">Coming</span>
         <h3 style="margin-top:16px">Web installer</h3>
-        <p>A one-button installer in Chrome or Edge, as for MNM-1, once veffbox leaves test builds.</p>
+        <p>A one-button installer in Chrome or Edge, as for MNM-1, once Veffbox leaves test builds.</p>
         <div class="ctas" style="margin-top:20px"><span class="btn" aria-disabled="true">Web installer coming</span></div>
         <details>
           <summary>Back to the stock firmware</summary>
@@ -954,7 +952,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         <ol>
           <li>Plug the FM&#8209;1 into the computer with a USB data cable.</li>
           <li>Run the command with the package's real file name.</li>
-          <li>Keep the cable in until it says it is done; the FM&#8209;1 restarts with veffbox.</li>
+          <li>Keep the cable in until it says it is done; the FM&#8209;1 restarts with Veffbox.</li>
         </ol>
         <p class="warn">Test firmware, installed at your own risk: no warranty, and the author accepts no responsibility if
           your FM&#8209;1 is damaged or misbehaves.</p>
@@ -966,7 +964,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
 
 <footer>
   <div class="wrap">
-    <p class="big">veffbox</p>
+    <p class="big">Veffbox</p>
     <div class="foot">
       <div>
         <h4>About</h4>
@@ -984,13 +982,13 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
       </div>
       <div>
         <h4>License and credits</h4>
-        <p>GPL-3.0-only, no warranty. veffbox is built on the platform of
+        <p>GPL-3.0-only, no warranty. Veffbox is built on the platform of
           <a href="https://github.com/galfaroth/mnm1">MNM-1</a>: its hardware layer, loader and install tools, which
           build on <a href="https://deadactive.github.io/hortator/">Hortator</a> by DEADACTIVE and
           <a href="https://github.com/hugelton/Felucca">Felucca</a> by Hügelton Instruments.</p>
       </div>
     </div>
-    <p class="fine">M-VAVE and FM&#8209;1 are trademarks of their owners. veffbox is not affiliated with M-VAVE.</p>
+    <p class="fine">M-VAVE and FM&#8209;1 are trademarks of their owners. Veffbox is not affiliated with M-VAVE.</p>
   </div>
 </footer>
 

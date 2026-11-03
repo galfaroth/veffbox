@@ -1,9 +1,9 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
-# Builds the veffbox FM-1 package on the Linux x86-64 build host (the JieLi toolchain runs only there).
+# Builds the Veffbox FM-1 package on the Linux x86-64 build host (the JieLi toolchain runs only there).
 #   tools/fm1_build.sh [MNM-1 tree]
 # The platform (HAL, LCD, USB + update entry, flash, loader, packager) is MNM-1's: its tree is copied to
-# build-fm1/, veffbox's sources are added, and MNM-1's build.py builds fw/veffbox.c instead of felucca.c.
+# build-fm1/, Veffbox's sources are added, and MNM-1's build.py builds fw/veffbox.c instead of felucca.c.
 # Env: JIELI_TOOLCHAIN, AC79_SDK (defaults: the build host's checkout next to the MNM-1 tree).
 set -e
 VB="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,13 +27,13 @@ for a, b in [
     ('FW / "src" / "felucca.c", "-o", OUT / "felucca.o"',
      'FW / "src" / os.environ.get("APP_ENTRY", "felucca.c"), "-o", OUT / "felucca.o"'),
     ('worker_errors, worker_notes = check_audio_worker.check(rt, syms)',
-     'worker_errors, worker_notes = ([], ["audio worker: none (veffbox)"]) if os.environ.get("APP_ENTRY") '
+     'worker_errors, worker_notes = ([], ["audio worker: none (Veffbox)"]) if os.environ.get("APP_ENTRY") '
      'else check_audio_worker.check(rt, syms)'),
     ("""    elf = OUT / "felucca.elf"
     extra = []
 """, """    elf = OUT / "felucca.elf"
     extra = []
-    for src in os.environ.get("APP_EXTRA", "").split():     # veffbox: the core, one object per file
+    for src in os.environ.get("APP_EXTRA", "").split():     # Veffbox: the core, one object per file
         obj = OUT / (Path(src).stem + ".o")
         tc("cc", *flags, "-c", FW / "src" / src, "-o", obj)
         extra.append(obj)
@@ -49,7 +49,7 @@ for a, b in [
         sys.exit("fm1_build: build.py changed, patch not applied: " + a[:60])
 open(p, "w").write(t)
 PY
-# veffbox's own identity and USB name (must contain "FM-1": the installers look for it)
+# Veffbox's own identity and USB name (must contain "FM-1": the installers look for it)
 python3 - "$T" <<'PY2'
 import re, sys
 root = sys.argv[1]

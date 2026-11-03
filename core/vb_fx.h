@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: the FX chain. 8 slots in any order, types may repeat; each slot has 4 parameters, MIX and ON.
+/* Veffbox core: the FX chain. 8 slots in any order, types may repeat; each slot has 4 parameters, MIX and ON.
  * Mono, Q15 in int32, processed in place in 32-sample blocks. Memory: each slot owns one buffer handed in by the app
  * (VB_FX_BUF int16 samples); a type uses as much of it as it needs. */
 #ifndef VB_FX_H

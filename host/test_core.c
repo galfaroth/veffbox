@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Host tests for the veffbox core. Renders every DRUM voice to host/out/ as WAV files and checks:
+/* Host tests for the Veffbox core. Renders every DRUM voice to host/out/ as WAV files and checks:
  *   - renders are bit-exact repeatable (recipes must rebuild identically),
  *   - no voice overflows 16 bits at any parameter setting (fuzzed),
  *   - the kick's SWEEP really sweeps (more zero crossings at the start than later),

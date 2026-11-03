@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Host tests for the veffbox FX chain. Every type processes a test signal (DRUM hits, then a decaying saw) at its
+/* Host tests for the Veffbox FX chain. Every type processes a test signal (DRUM hits, then a decaying saw) at its
  * default settings and at hundreds of fuzzed ones (extremes included, some with the knobs moving every block), and:
  *   - the output never leaves 16 bits,
  *   - renders are bit-exact repeatable,

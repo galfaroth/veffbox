@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: SAMP, the sampler that plays a print. Prints are stored at 22.05 kHz, 16-bit mono.
+/* Veffbox core: SAMP, the sampler that plays a print. Prints are stored at 22.05 kHz, 16-bit mono.
  * Patch: START LEN LOOP(OFF FWD P-P) REV PITCH(24 = 0 semitones) FINE(50 = 0) FADE GAIN. */
 #ifndef VB_SAMP_H
 #define VB_SAMP_H

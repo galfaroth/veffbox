@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: fixed-point helpers. Integer only (the FM-1 has no FPU and no 64-bit divide;
+/* Veffbox core: fixed-point helpers. Integer only (the FM-1 has no FPU and no 64-bit divide;
  * wide multiplies only through vb_mul_sh). Audio is Q15 in int32 between stages. */
 #ifndef VB_DSP_H
 #define VB_DSP_H

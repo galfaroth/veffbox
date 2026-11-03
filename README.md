@@ -1,16 +1,16 @@
-# veffbox
+# Veffbox
 
 A resampling sound-design instrument for the M-VAVE FM-1.
 
-One sound at a time: pick a source (OP4 FM, ANLG, DRUM, or a print as SAMP / GRAN / CHOP), play it
+One sound at a time: pick a source (OP4 FM, ANLG, DRUM, or a resample as SAMP / GRAN / CHOP), play it
 as notes, a sequence or a strummed chord sequence, modulate anything with 6 LFOs and 3 envelopes
-(4 destinations each), stack up to 8 effects, then **PRINT**. The print becomes the next source.
-Every print keeps its recipe, so each of the 64 bank sounds has a generation tree you can branch
+(4 destinations each), stack up to 8 effects, then **RESAMPLE**. The resample becomes the next source.
+Every resample keeps its recipe, so each of the 64 bank sounds has a generation tree you can branch
 from or rebuild bit-exactly.
 
-**Status:** firmware 0.2.1 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
-chord sequences, modulation, the FX chain, PRINT, the 64-sound bank with generations in flash, and bit-exact REBUILD.
-Not yet: four tracks sounding at once, PITCH as a modulation target, prints longer than 1.67 s.
+**Status:** firmware 0.2.2 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
+chord sequences, modulation, the FX chain, RESAMPLE, the 64-sound bank with generations in flash, and bit-exact REBUILD.
+Not yet: four tracks sounding at once, PITCH as a modulation target, resamples longer than 1.67 s.
 
 ## Build, install, test on the hardware
 
@@ -32,13 +32,13 @@ Open <http://localhost:8137/>. The page is the FM-1 panel: click or drag the kno
 buttons, play the keys (or Z S X D C… on the computer keyboard). The side panel explains every
 click. Hash links open a screen directly, e.g. `#t4/SRC` (the DRUM kit) or `#t2/MOD`.
 
-| FM-1 control | veffbox |
+| FM-1 control | Veffbox |
 | --- | --- |
 | EDIT | source (SRC): SELECT picks the engine, the keys pick the DRUM voice · SEL = RANDOMIZE |
 | ARP / SEQ | play mode and strum / step row |
 | LFO / ENV | modulation · SEL = LEARN a destination |
 | FX | FX chain · SEL = SCRAMBLE |
-| HOME / REC | print settings / print from any page |
+| HOME / REC | resample settings / resample from any page |
 | SAVE | bank: the generation tree, LOAD / EDIT / REBUILD |
 | GLO | tempo, scale, CHAOS |
 | hold SEL | undo the random rolls |
@@ -62,4 +62,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, budgets and mil
 
 ## License
 
-GPL-3.0-only. veffbox builds on [MNM-1](https://github.com/galfaroth/mnm1).
+GPL-3.0-only. Veffbox builds on [MNM-1](https://github.com/galfaroth/mnm1).

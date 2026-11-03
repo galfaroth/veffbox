@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: GRAN, a granular player over the print (the buffer of vb_samp_buffer(): 22.05 kHz, 16-bit mono).
+/* Veffbox core: GRAN, a granular player over the print (the buffer of vb_samp_buffer(): 22.05 kHz, 16-bit mono).
  *
  * Patch: 11 bytes, in this order:
  *   POS    0..127  where in the print grains are taken (0 = start, 127 = end); grains are centred on it

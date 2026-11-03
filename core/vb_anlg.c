@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: ANLG, two oscillators + sub + noise -> tanh drive -> 24 dB/oct ladder low-pass -> VCA.
+/* Veffbox core: ANLG, two oscillators + sub + noise -> tanh drive -> 24 dB/oct ladder low-pass -> VCA.
  * Fixed point, deterministic. The envelope runs every 8 samples; the VCA gain and the filter coefficient are ramped
  * linearly in between.
  *

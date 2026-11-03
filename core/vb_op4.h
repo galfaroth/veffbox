@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: OP4, a 4-operator phase-modulation FM voice (vb_engine_t).
+/* Veffbox core: OP4, a 4-operator phase-modulation FM voice (vb_engine_t).
  *
  * Patch: 38 bytes. For each operator A, B, C, D (9 each): WAVE CRS FINE LVL ATK DEC SUS REL FIX; then ALG, FB.
  *   WAVE  SIN SIN3 SIN5 SAW SQR TRI NOIS

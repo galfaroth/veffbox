@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: the generic voice-engine interface (OP4, ANLG; DRUM keeps its own kit interface).
+/* Veffbox core: the generic voice-engine interface (OP4, ANLG; DRUM keeps its own kit interface).
  *
  * A patch is a flat array of 0..127 bytes, one per descriptor, in descriptor order. The app applies modulation by
  * passing an effective copy of the patch (knob + modulation delta, clamped) to render(), once per 32-sample block,

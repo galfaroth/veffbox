@@ -11,7 +11,7 @@
 
 /* ---- what the platform gives vb_app.c */
 #define CTL 32u
-#define FELUCCA_VERSION "veffbox host"
+#define FELUCCA_VERSION "Veffbox host"
 static uint32_t fm1_ms = 1000;
 static const int flash_ok = 0;
 static int st_read(uint32_t a, void *d, uint32_t n) { (void)a; (void)d; (void)n; return -1; }

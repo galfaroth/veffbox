@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: the player. Renders one sound (a recipe) in 32-sample blocks: the transport and the play mode
+/* Veffbox core: the player. Renders one sound (a recipe) in 32-sample blocks: the transport and the play mode
  * (notes, a 16-step line, or a strummed chord sequence), the voices of the source engine, modulation (6 LFOs and
  * 3 envelopes, 4 routes each, applied to effective copies of the patches), the FX chain, and PRINT capture.
  *

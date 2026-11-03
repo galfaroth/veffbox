@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: the sound. A recipe holds everything a print needs (source patches, play data, modulation, FX
+/* Veffbox core: the sound. A recipe holds everything a print needs (source patches, play data, modulation, FX
  * chain, print settings, seed); the player renders it. Parameters are addressed uniformly (vb_addr_t) so the UI,
  * LEARN and modulation share one scheme. */
 #ifndef VB_SOUND_H

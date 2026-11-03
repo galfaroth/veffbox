@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: DRUM, eight 808-style voices with shapeable pitch sweeps.
+/* Veffbox core: DRUM, eight 808-style voices with shapeable pitch sweeps.
  * Every voice has its own state, so a whole kit rings at once (a hat over a kick tail). */
 #ifndef VB_DRUM_H
 #define VB_DRUM_H

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Remote control and diagnostics for veffbox on a connected FM-1 (USB MIDI SysEx, fw/vb_app.c vb_remote).
+"""Remote control and diagnostics for Veffbox on a connected FM-1 (USB MIDI SysEx, fw/vb_app.c vb_remote).
 
   fm1_remote.py stats                       the audio load and the app's state
   fm1_remote.py press PLAY|EDIT|...|SEL     a button
@@ -58,7 +58,7 @@ class Remote:
                     s["cpu_last_pct"] = 100 * s["last_us"] / HALF_US
                     return s
             time.sleep(0.01)
-        raise SystemExit("no answer from the FM-1 (is veffbox running?)")
+        raise SystemExit("no answer from the FM-1 (is Veffbox running?)")
 
     def press(self, b):
         self.send(2, BUTTONS.index(b.upper()))

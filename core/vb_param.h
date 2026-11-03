@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: parameter descriptors and the engine / effect registry.
+/* Veffbox core: parameter descriptors and the engine / effect registry.
  *
  * An engine or an effect is a table entry, not a hand-written page. Its descriptors drive:
  *   - the 4-knob rows on the screen,

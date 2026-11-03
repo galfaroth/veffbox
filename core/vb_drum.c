@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: DRUM engine, eight 808-style voices. Fixed point, deterministic. */
+/* Veffbox core: DRUM engine, eight 808-style voices. Fixed point, deterministic. */
 #include "vb_drum.h"
 #include "vb_dsp.h"
 

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* veffbox core: OP4, 4-operator phase-modulation FM. Fixed point, deterministic.
+/* Veffbox core: OP4, 4-operator phase-modulation FM. Fixed point, deterministic.
  *
  * Per sample each operator is: phase += inc; y = wave(phase + modulation) * amp. amp (Q16) is level x velocity x
  * envelope; the envelopes run every 8 samples and amp is ramped linearly in between, so the per-sample work is a
