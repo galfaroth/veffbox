@@ -22,6 +22,12 @@ python3 tools/fm1_remote.py press PLAY                  # buttons, encoders and 
 ```
 USB audio is the output at full level, independent of MASTER. USB MIDI notes play the sound.
 
+## On the web
+
+`site/` is the published site: the landing page, the emulator (`site/emu/`, built with `make emu`: the firmware
+itself as WebAssembly, with sound), the mockup (`site/demo/`) and the web installer (`site/install/`, assembled with
+`python3 tools/make_site.py dist/veffbox-X.Y.Z.fwsc`). `.github/workflows/pages.yml` publishes it.
+
 ## Try the interface
 
 ```

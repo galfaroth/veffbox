@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Veffbox emulator</title>
+<meta name="description" content="The Veffbox firmware running in the browser: the FM-1's screen and sound from the same code.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fcf2f8;--surface:#f4d9ea;--tray:#ecc6de;--accent:#e07fb5;--accent-ink:#9c2f69;--ink:#1d0819;--ink-2:#4a2a40;
+  --key:#fffafd;--key-b:#e5b9d4;--mono:'Space Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0}
+html,body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',system-ui,sans-serif;-webkit-text-size-adjust:100%}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px}
+.dev{width:100%;max-width:980px;background:var(--surface);border-radius:32px;padding:20px;box-shadow:0 2px 0 var(--tray),0 24px 60px #9c2f6922;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.top{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+@media (min-width:760px){.top{grid-template-columns:auto minmax(0,1fr);align-items:start}}
+.screen{position:relative;background:var(--ink);border-radius:22px;padding:12px;width:min(100%,384px);margin:0 auto}
+canvas{display:block;width:100%;aspect-ratio:1;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:8px;background:#e07fb5}
+.start{position:absolute;inset:12px;border:0;border-radius:8px;background:#e07fb5;color:var(--ink);font:700 22px/1.2 'Space Grotesk',sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.start small{font:400 13px/1.3 var(--mono);max-width:24ch;text-align:center}
+.start[hidden]{display:none}
+.controls{display:flex;flex-direction:column;gap:16px}
+.encs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 6px}
+.enc{display:flex;flex-direction:column;align-items:center;gap:4px;font:700 11px/1 var(--mono);letter-spacing:.04em;color:var(--ink-2);touch-action:none;cursor:ns-resize}
+.enc i{width:52px;height:52px;border-radius:50%;background:var(--ink);position:relative;box-shadow:0 3px 0 #00000033}
+.enc.k i{background:var(--accent)}
+.enc i::after{content:"";position:absolute;left:50%;top:6px;width:4px;height:14px;margin-left:-2px;border-radius:2px;background:var(--bg);transform-origin:2px 20px;transform:rotate(var(--r,0deg))}
+.enc.k i::after{background:var(--ink)}
+.btns{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.b{border:0;border-radius:12px;background:var(--key);color:var(--ink);font:700 12px/1.1 'Space Grotesk',sans-serif;padding:9px 2px 7px;box-shadow:0 3px 0 var(--key-b);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.b small{font:400 9.5px/1 var(--mono);color:var(--accent-ink);letter-spacing:.02em}
+.b.on{background:var(--ink);color:var(--bg)}
+.b.on small{color:var(--accent)}
+.b:active,.b.down{transform:translateY(2px);box-shadow:0 1px 0 var(--key-b)}
+.b.rec small{color:#c0186e}
+.row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.vol{display:flex;align-items:center;gap:8px;font:700 11px var(--mono);color:var(--ink-2)}
+.vol input{accent-color:var(--ink);width:120px}
+.keys{position:relative;margin-top:18px;height:150px;background:var(--tray);border-radius:20px;padding:10px;touch-action:none}
+.keys .w,.keys .k2{position:absolute;border-radius:0 0 10px 10px;cursor:pointer}
+.keys .w{background:var(--key);box-shadow:inset 0 -4px 0 var(--key-b);top:10px;bottom:10px}
+.keys .k2{background:#d993bd;top:10px;height:58%;z-index:1;box-shadow:inset 0 -4px 0 #b9709d}
+.keys .down{filter:brightness(.82)}
+.help{max-width:980px;width:100%;margin-top:14px;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.help kbd{font:12px var(--mono);background:var(--surface);border-radius:6px;padding:1px 6px;box-shadow:0 2px 0 var(--tray)}
+.help a{color:var(--accent-ink)}
+.err{color:#b00045;font-weight:700}
+</style>
+</head>
+<body>
+<div class="dev" id="dev">
+  <div class="top">
+    <div class="screen">
+      <canvas id="lcd" width="240" height="240" aria-label="The FM-1 screen"></canvas>
+      <button class="start" id="start" type="button">▶ Start the emulator<small>the Veffbox firmware, in your browser, with sound</small></button>
+    </div>
+    <div class="controls">
+      <div class="encs" id="encs"></div>
+      <div class="btns" id="btns"></div>
+      <div class="row2"><label class="vol">MASTER <input id="vol" type="range" min="0" max="4095" value="2600"></label></div>
+    </div>
+  </div>
+  <div class="keys" id="keys" aria-label="27 keys"></div>
+</div>
+<p class="help" id="help">Knobs: drag up or down, or scroll. Computer keys: <kbd>Z</kbd><kbd>S</kbd><kbd>X</kbd><kbd>D</kbd><kbd>C</kbd>… and
+  <kbd>Q</kbd><kbd>2</kbd><kbd>W</kbd><kbd>3</kbd>… play the keys chromatically from F, <kbd>Space</kbd> PLAY, <kbd>Enter</kbd> REC,
+  <kbd>\</kbd> SEL (hold to undo), <kbd>[</kbd> <kbd>]</kbd> SELECT, <kbd>←</kbd> <kbd>→</kbd> OCT. Your bank is kept in this browser.
+  New here? <a href="../#guide" target="_top">Make your first sound</a>.</p>
+<script src="veffbox.js"></script>
+<script>
+(() => {
+'use strict';
+/* Veffbox's order (fw/vb_app.c B_* and EN_*) */
+const BTN = ['FX','SEL','ENV','LFO','EDIT','GLO','HOME','SAVE','ARP','SEQ','PLAY','REC','OCT-','OCT+'];
+const SUB = {FX:'FX',SEL:'ACT',ENV:'ENV',LFO:'LFO',EDIT:'SRC',GLO:'GLO',HOME:'RESAMPLE',SAVE:'BANK',ARP:'MODE',SEQ:'STEP',PLAY:'▶ ■',REC:'● RESAMPLE','OCT-':'','OCT+':''};
+const LAYOUT = ['FX','SEL','ENV','LFO','EDIT','GLO','HOME','SAVE','ARP','SEQ','PLAY','REC','OCT-','OCT+'];
+const ENC = [['SELECT',0],['ALGORITHM',1],['PRESETS',2],['',-1],['KNOB 1',3],['KNOB 2',4],['KNOB 3',5],['KNOB 4',6]];
+const KEYMAP = 'zsxdcfvbhnjm,l.;/q2w3e4rt6y'; /* 27 keys, chromatic from key 0 */
+const STORE = 'veffbox-flash-v1';
+let M = null, ctx = null, img = null, flashSeen = 0, lastSave = 0, raf = 0;
+const $ = id => document.getElementById(id);
+const lcd = $('lcd'), g = lcd.getContext('2d');
+
+/* ---- the panel */
+const encs = $('encs');
+ENC.forEach(([name, id]) => {
+  const el = document.createElement('div');
+  if (id < 0) { encs.appendChild(el); return; }
+  el.className = 'enc' + (id >= 3 ? ' k' : '');
+  el.innerHTML = `<i></i><span>${name}</span>`;
+  let rot = 0, y0 = null, acc = 0;
+  const turn = d => { if (!M || !d) return; M._emu_encoder(id, d); rot += d * 15; el.style.setProperty('--r', rot + 'deg'); };
+  el.addEventListener('pointerdown', e => { y0 = e.clientY; acc = 0; el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointermove', e => { if (y0 === null) return; acc += y0 - e.clientY; y0 = e.clientY;
+    const d = Math.trunc(acc / 10); if (d) { acc -= d * 10; turn(d); } });
+  el.addEventListener('pointerup', () => { y0 = null; });
+  el.addEventListener('wheel', e => { e.preventDefault(); turn(e.deltaY < 0 ? 1 : -1); }, {passive: false});
+  encs.appendChild(el);
+});
+const btnEl = {};
+LAYOUT.forEach(name => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'b' + (name === 'REC' ? ' rec' : '');
+  b.innerHTML = `${name}<small>${SUB[name] || '&nbsp;'}</small>`;
+  const i = BTN.indexOf(name);
+  const down = e => { e.preventDefault(); if (M) { M._emu_button(i, 1); b.classList.add('down'); } };
+  const up = () => { if (M && b.classList.contains('down')) { M._emu_button(i, 0); b.classList.remove('down'); } };
+  b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up);
+  btnEl[i] = b; $('btns').appendChild(b);
+});
+/* 27 keys from F: white and black like a keyboard */
+const keys = $('keys'), keyEl = [];
+(() => {
+  const black = n => [1, 3, 6, 8, 10].includes((n + 5) % 12);         /* key 0 = F */
+  const whites = [...Array(27).keys()].filter(n => !black(n)).length;
+  let w = 0;
+  for (let n = 0; n < 27; n++) {
+    const el = document.createElement('div');
+    if (black(n)) { el.className = 'k2'; el.style.left = `calc(10px + ${(w - .32) / whites} * (100% - 20px))`; el.style.width = `calc(${.64 / whites} * (100% - 20px))`; }
+    else { el.className = 'w'; el.style.left = `calc(10px + ${w / whites} * (100% - 20px) + 2px)`; el.style.width = `calc(${1 / whites} * (100% - 20px) - 4px)`; w++; }
+    el.dataset.n = n; keys.appendChild(el); keyEl[n] = el;
+  }
+})();
+const held = new Set();
+const keyDown = n => { if (!M || held.has(n)) return; held.add(n); M._emu_key(n, 1); keyEl[n].classList.add('down'); };
+const keyUp = n => { if (!M || !held.has(n)) return; held.delete(n); M._emu_key(n, 0); keyEl[n].classList.remove('down'); };
+const ptrKey = new Map();
+keys.addEventListener('pointerdown', e => { const n = e.target.dataset.n; if (n === undefined) return; keys.setPointerCapture(e.pointerId); ptrKey.set(e.pointerId, +n); keyDown(+n); });
+keys.addEventListener('pointermove', e => { if (!ptrKey.has(e.pointerId)) return; const t = document.elementFromPoint(e.clientX, e.clientY), n = t && t.dataset ? t.dataset.n : undefined;
+  if (n !== undefined && +n !== ptrKey.get(e.pointerId)) { keyUp(ptrKey.get(e.pointerId)); ptrKey.set(e.pointerId, +n); keyDown(+n); } });
+const ptrEnd = e => { if (ptrKey.has(e.pointerId)) { keyUp(ptrKey.get(e.pointerId)); ptrKey.delete(e.pointerId); } };
+keys.addEventListener('pointerup', ptrEnd); keys.addEventListener('pointercancel', ptrEnd);
+
+/* computer keyboard */
+const KB_BTN = {' ': 'PLAY', Enter: 'REC', '\\': 'SEL', ArrowLeft: 'OCT-', ArrowRight: 'OCT+'};
+addEventListener('keydown', e => {
+  if (!M || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (k === '[' || k === ']') { M._emu_encoder(0, k === ']' ? 1 : -1); e.preventDefault(); return; }
+  if (KB_BTN[k]) { e.preventDefault(); if (!e.repeat) { const i = BTN.indexOf(KB_BTN[k]); M._emu_button(i, 1); btnEl[i].classList.add('down'); } return; }
+  const n = KEYMAP.indexOf(k); if (n >= 0 && !e.repeat) { keyDown(n); e.preventDefault(); }
+});
+addEventListener('keyup', e => {
+  if (!M) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (KB_BTN[k]) { const i = BTN.indexOf(KB_BTN[k]); M._emu_button(i, 0); btnEl[i].classList.remove('down'); return; }
+  const n = KEYMAP.indexOf(k); if (n >= 0) keyUp(n);
+});
+$('vol').addEventListener('input', e => { if (M) M._emu_master(+e.target.value); });
+
+/* ---- the bank in this browser */
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+function loadFlash() {
+  try { const s = localStorage.getItem(STORE); if (!s) return false;
+    const bin = atob(s), p = M._emu_flash(), n = M._emu_flash_size(); if (bin.length !== n) return false;
+    for (let i = 0; i < n; i++) M.HEAPU8[p + i] = bin.charCodeAt(i); return true; } catch (e) { return false; }
+}
+function saveFlash() {
+  try { const p = M._emu_flash(); localStorage.setItem(STORE, b64(M.HEAPU8.subarray(p, p + M._emu_flash_size()))); } catch (e) { /* storage full or blocked: the bank lives until the tab closes */ }
+}
+
+/* ---- screen, LEDs, audio */
+function frame(t) {
+  M._emu_frame(t >>> 0);
+  const fb = M._emu_fb() >> 1, px = M.HEAPU16, d = img.data;
+  for (let i = 0; i < 240 * 240; i++) {
+    const c = px[fb + i], o = i * 4;
+    d[o] = (c >> 11) * 255 / 31; d[o + 1] = ((c >> 5) & 63) * 255 / 63; d[o + 2] = (c & 31) * 255 / 31; d[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  for (let i = 0; i < BTN.length; i++) btnEl[i].classList.toggle('on', !!M._emu_led(i));
+  const w = M._emu_flash_writes();
+  if (w !== flashSeen && t - lastSave > 1500) { flashSeen = w; lastSave = t; saveFlash(); }
+  raf = requestAnimationFrame(frame);
+}
+async function start() {
+  const btn = $('start');
+  btn.disabled = true; btn.firstChild.textContent = 'Loading…';
+  try {
+    M = await Veffbox();
+    M._emu_init(loadFlash() ? 1 : 0);
+    M._emu_master(+$('vol').value);
+    flashSeen = M._emu_flash_writes();
+    img = g.createImageData(240, 240);
+    ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100});
+    const N = 1024, node = ctx.createScriptProcessor(N, 0, 2);
+    node.onaudioprocess = e => {
+      M._emu_audio(N);
+      const src = M.HEAPF32.subarray(M._emu_audio_buf() >> 2, (M._emu_audio_buf() >> 2) + N);
+      e.outputBuffer.getChannelData(0).set(src); e.outputBuffer.getChannelData(1).set(src);
+    };
+    node.connect(ctx.destination);
+    btn.hidden = true;
+    raf = requestAnimationFrame(frame);
+  } catch (err) {
+    btn.disabled = false; btn.innerHTML = `<span class="err">Could not start</span><small>${String(err.message || err)}</small>`;
+  }
+}
+$('start').addEventListener('click', start);
+if (location.hash === '#autostart') start();        /* (tests and links that already had a click) */
+document.addEventListener('visibilitychange', () => { if (!ctx) return; document.hidden ? (saveFlash(), ctx.suspend()) : ctx.resume(); });
+addEventListener('pagehide', () => { if (M) saveFlash(); });
+})();
+</script>
+</body>
+</html>

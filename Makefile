@@ -7,7 +7,7 @@ CORE = $(wildcard core/*.c)
 TESTS = $(patsubst %.c,%,$(wildcard host/test_*.c))
 
 
-.PHONY: test tables clean shots
+.PHONY: test tables clean shots emu
 MNM ?= ..
 test: $(TESTS)
 	@mkdir -p host/out
@@ -21,6 +21,13 @@ shots: host/shot.c fw/vb_app.c $(CORE)
 	$(CC) -std=c11 -O1 -w -I$(MNM)/firmware/src -I$(MNM)/build/gen -o host/shot host/shot.c $(CORE) -lz
 	@mkdir -p host/shots
 	./host/shot
+
+# the web emulator: the firmware as WebAssembly for site/emu/ (emscripten's emcc on the PATH)
+EMU_FN = _emu_fb,_emu_flash,_emu_flash_size,_emu_flash_writes,_emu_audio_buf,_emu_init,_emu_frame,_emu_button,_emu_led,_emu_encoder,_emu_key,_emu_master,_emu_audio,_emu_playing
+emu: host/emu.c host/vb_host.h fw/vb_app.c $(CORE)
+	emcc -std=c11 -O2 -w -I$(MNM)/firmware/src -I$(MNM)/build/gen host/emu.c $(CORE) -o site/emu/veffbox.js \
+	  -sMODULARIZE=1 -sEXPORT_NAME=Veffbox -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH=1 \
+	  -sEXPORTED_FUNCTIONS=$(EMU_FN) -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU16,HEAPF32
 
 tables:
 	python3 tools/gen_tables.py > core/vb_tables.h

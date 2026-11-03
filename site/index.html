@@ -98,6 +98,11 @@ p+p{margin-top:.8em}
 .try-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 24px;margin-bottom:18px}
 .try-head p{font-size:16px;color:var(--ink-2);max-width:640px}
 .frame{container-type:inline-size;background:var(--bg);border-radius:var(--radius);box-shadow:0 0 0 2px var(--surface),0 30px 80px -30px #c0679a55;overflow:hidden;position:relative}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.tabs button{border:0;border-radius:999px;padding:10px 18px;font:700 15px/1 inherit;font-family:inherit;background:var(--surface);color:var(--ink);cursor:pointer}
+.tabs button[aria-selected=true]{background:var(--ink);color:var(--bg)}
+.frame iframe.emu{height:calc(100cqw * 1.05 + 640px)}
+@container (min-width:760px){.frame iframe.emu{height:680px}}
 .frame iframe{display:block;width:100%;border:0;background:var(--bg);height:calc((100cqw - 32px) * 1.838 + 34px)}
 @container (min-width:760px){.frame iframe{height:calc(62cqw + 640px)}}
 .frame-bar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;margin-top:14px;font-size:15px;color:var(--ink-2)}
@@ -365,7 +370,7 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
       source, a strummed chord sequence, modulation and up to eight effects. Then <b>RESAMPLE</b>: the recording becomes the
       new source, and the recipe that made it is kept, so every sound can be <b>rebuilt bit for bit</b>.</p>
     <div class="ctas">
-      <a class="btn" href="#try">Try the panel <span aria-hidden="true">↓</span></a>
+      <a class="btn" href="#try">Play it in the browser <span aria-hidden="true">↓</span></a>
       <a class="btn ghost" href="#guide">Your first sound</a>
     </div>
     <ul class="facts">
@@ -381,21 +386,31 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
   <div class="wrap">
     <div class="try-head">
       <div>
-        <p class="kicker" style="margin-bottom:10px">Interactive · no audio yet</p>
-        <h3 id="try-title">This is the interface. Click it.</h3>
+        <p class="kicker" style="margin-bottom:10px">Interactive · with sound</p>
+        <h3 id="try-title">Play it right here.</h3>
       </div>
-      <p>The FM&#8209;1 panel as Veffbox lays it out: 240×240 screen, 7 encoders, 14 buttons, 27 keys. Drag the knobs, press
-        <kbd>SEL</kbd> on <kbd>EDIT</kbd> to randomize, <kbd>REC</kbd> to resample. The panel below it explains every click.</p>
+      <p>The <b>emulator</b> runs the Veffbox firmware itself in your browser: the same screen, the same engines, the same
+        sound, and your bank is kept in this browser. The <b>mockup</b> is silent but explains every click.</p>
+    </div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-src="emu/index.html" data-k="emu">Emulator · with sound</button>
+      <button type="button" role="tab" aria-selected="false" data-src="demo/index.html#t4/SRC" data-k="demo">Mockup · explains every click</button>
     </div>
     <div class="frame">
-      <iframe id="demo" src="demo/index.html#t4/SRC" title="Veffbox interface mockup: the FM-1 panel" loading="eager"></iframe>
+      <iframe id="demo" class="emu" src="emu/index.html" title="Veffbox emulator: the firmware in the browser" loading="eager" allow="autoplay"></iframe>
     </div>
     <div class="frame-bar">
       <span>Computer keyboard: <kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> <kbd>D</kbd> <kbd>C</kbd>… play the keys, <kbd>Space</kbd> PLAY, <kbd>Enter</kbd> resample, <kbd>\</kbd> SEL (click the panel first).</span>
-      <a href="demo/index.html" target="_blank" rel="noopener">Open full screen ↗</a>
+      <a id="full" href="emu/index.html" target="_blank" rel="noopener">Open full screen ↗</a>
     </div>
   </div>
 </section>
+<script>
+(() => { const f = document.getElementById('demo'), full = document.getElementById('full');
+  document.querySelectorAll('.tabs [role=tab]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs [role=tab]').forEach(x => x.setAttribute('aria-selected', x === b));
+    f.src = b.dataset.src; f.className = b.dataset.k; full.href = b.dataset.src.split('#')[0]; })); })();
+</script>
 
 <!-- GUIDE -->
 <section class="s" id="guide" aria-labelledby="guide-title">
@@ -929,10 +944,12 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
     </div>
     <div class="inst">
       <div class="card">
-        <span class="tag soft">Coming</span>
+        <span class="tag">Firmware 0.2.2</span>
         <h3 style="margin-top:16px">Web installer</h3>
-        <p>A one-button installer in Chrome or Edge, as for MNM-1, once Veffbox leaves test builds.</p>
-        <div class="ctas" style="margin-top:20px"><span class="btn" aria-disabled="true">Web installer coming</span></div>
+        <p>One button, in Chrome or Edge on a computer. Connect the FM&#8209;1 with a USB data cable and keep the page open
+          until it says Done.</p>
+        <div class="ctas" style="margin-top:20px"><a class="btn" href="install/">Install Veffbox</a>
+          <a class="btn ghost" href="firmware/veffbox-0.2.2.fwsc" download>Download the .fwsc</a></div>
         <details>
           <summary>Back to the stock firmware</summary>
           <p>M-VAVE's own updater puts the official FM&#8209;1 firmware back.</p>
@@ -945,9 +962,9 @@ footer .big{font-size:clamp(56px,13vw,180px);font-weight:700;letter-spacing:-.07
         </details>
       </div>
       <div class="card">
-        <span class="tag">Today</span>
+        <span class="tag soft">Or</span>
         <h3 style="margin-top:16px">Command line</h3>
-        <p>For test builds, with the install tool from an MNM-1 checkout:</p>
+        <p>With the install tool from an MNM-1 checkout:</p>
         <div class="cmd"><button class="copy" type="button" data-copy="python3 tools/fm1_install.py veffbox-X.Y.Z.fwsc --port FM-1 --yes">copy</button><pre><span class="p">$ </span>python3 tools/fm1_install.py veffbox-X.Y.Z.fwsc --port FM&#8209;1 --yes</pre></div>
         <ol>
           <li>Plug the FM&#8209;1 into the computer with a USB data cable.</li>

@@ -32,10 +32,15 @@ and screenshots of the new screens (`make shots`).
 - CHOP's transient detection runs in the audio ISR (52% peak on the first detection): move it to the main loop.
 - The 63% spike at the start of a resample: the FX buffers are cleared in the ISR.
 - USB audio not yet verified by recording, because macOS blocks the microphone for the build session.
-- Publishing the site: the repo is private (GitHub Pages or another host?).
-- Checking how the Firmware Hub shows the identity `FM-1_62000100`.
+- Publishing: GitHub Pages and The Firmware Hub need the repo public (Pages is refused on the current plan for a
+  private repo; the hub lists only open source with a public GitHub release).
+- The Firmware Hub's test list: install from V15, and leave Veffbox again (installing another firmware from it).
 
 ## Done
+
+- The site: the emulator (the firmware as WebAssembly, `make emu`: real screen, real sound, the bank kept in the
+  browser), the web installer (MNM-1's, `tools/make_site.py`), `fmhub.json`, and a Pages workflow.
+  `FM-1_62000100` is free on The Firmware Hub (checked against its catalogue of 151 firmwares on 2026-11-03).
 
 - Mockup: DUCK, GATE and VOCODER keyed by any track; the SC modulation source; MUTE per track on GLO (row 3); a muted
   track still keys. The spectral FX (SPEC FREEZE, SMEAR, SPEC SHIFT, SPEC GATE, ROBOT). Chords with 8 notes, BASS and

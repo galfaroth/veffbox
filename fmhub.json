@@ -1,0 +1,8 @@
+{
+  "what": "Resampling sound design. Build one sound from FM, analog or 808-style drums, play it as notes, steps or strummed chords, add 6 LFOs, 3 envelopes and 8 FX, then resample it into a new source. Every resample keeps its recipe, so a 64-sound bank of generation trees rebuilds bit for bit.",
+  "author": "Veff",
+  "kinds": ["synth", "chords"],
+  "play": "https://galfaroth.github.io/veffbox/emu/",
+  "cheat": "https://galfaroth.github.io/veffbox/#guide",
+  "image": "docs/fmhub.png"
+}
