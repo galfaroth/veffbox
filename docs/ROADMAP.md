@@ -28,10 +28,12 @@ and screenshots of the new screens (`make shots`).
 - CHOP's transient detection runs in the audio ISR (52% peak on the first detection): move it to the main loop.
 - The 63% spike at the start of a resample: the FX buffers are cleared in the ISR.
 - USB audio not yet verified by recording, because macOS blocks the microphone for the build session.
-- The Firmware Hub: install from V15 (not tested yet), then send the mail (zven@thefirmwarehub.com).
+- The Firmware Hub: the reply to Sven (the V15 test is done), then the listing.
 
 ## Done
 
+- Tested with the official V15 on the FM-1 (2026-11-04): Veffbox 0.3.2 -> V15 (the hub's file, SHA-256 db1642b2..., the
+  FM-1 reported FM-1_015), then V15 -> the 0.3.2 release file (dccb1783...), FM-1_62000100, keys and sound fine.
 - 0.3.1: CHOP SPLIT: TRANS (the transients, SENS) or EVEN (SLICES equal parts, 2..64); the screen marks the cuts
 - 0.3.2: the screen as the mockup draws it: OP4's algorithm drawn with the operator's envelope, the LFO's cycle with its moving position, the ENV's ADSR, rounded chips, boxes and pills
   (from the analysis the audio thread already made: the UI never analyses). Flash format 4 (8 spare bytes in the
