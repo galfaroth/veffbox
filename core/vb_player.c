@@ -104,6 +104,8 @@ static void voice_on(vb_player_t *p, int note, int vel)
     note = clampi(note, 0, 127);
     vel = clampi(vel, 1, 127);
     p->last_note = (uint8_t)note;
+    if (p->note_out && !p->rec)
+        p->note_out(p->out_ch, (uint8_t)note, (uint8_t)vel, 1);
     env_gate(p, 1);
     for (i = 0; i < 6; i++)
         vb_lfo_note(&p->lfo[i]);
@@ -142,6 +144,8 @@ static void voice_on(vb_player_t *p, int note, int vel)
 static void voice_off(vb_player_t *p, int note)
 {
     uint32_t v, held = 0;
+    if (p->note_out && !p->rec)
+        p->note_out(p->out_ch, (uint8_t)note, 0, 0);
     if (!p->eng) {
         env_gate(p, 0);
         return;
@@ -262,11 +266,83 @@ static void sched_chord(vb_player_t *p, const vb_chord_t *c, uint32_t steplen)
         ev_add(p, off_t, ns[k], 0, 0);
 }
 
+/* ARP: the held keys, else the chord playing (its own progression, or CHORDS'), over the octaves, in the pattern */
+static void arp_16th(vb_player_t *p)
+{
+    static const uint8_t PER[4] = {1, 2, 4, 1};          /* sixteenths a note: 1/16 1/8 1/4, 1/32 (two a sixteenth) */
+    vb_recipe_t *rc = p->rc;
+    const vb_play_t *pl = &rc->play, *hp = p->harm && !p->rec ? p->harm : pl;
+    uint8_t ns[32];
+    int n = 0, i, j, oct = 1 + (rc->arp_oct & 3u), rate = rc->arp_rate & 3u, idx, note;
+    uint32_t s16 = p->tick_q8 >> 8, dur;
+    if (p->playing) {                                     /* the progression moves on as in CHORD */
+        if (p->step_left <= 0) {
+            int len = clampi(hp->len, 1, VB_CHORD_STEPS);
+            p->step = (uint8_t)(p->chord_count ? (p->step + 1) % len : 0);
+            p->step_left = vb_len16[hp->chord[p->step].len_i % 12u];
+            p->chord_count++;
+        }
+        p->step_left--;
+    }
+    if (p->arp_sub > 0) {
+        p->arp_sub--;
+        return;
+    }
+    p->arp_sub = (uint8_t)(PER[rate] - 1u);
+    if (p->nheld) {
+        for (i = 0; i < p->nheld; i++)
+            ns[n++] = p->held[i];
+    } else if (p->playing) {
+        const vb_chord_t *c = &hp->chord[p->step % VB_CHORD_STEPS];
+        for (i = 0; i < c->n && i < 8; i++)
+            ns[n++] = c->note[i];
+    }
+    if (!n)
+        return;
+    if (rc->arp_pat != VB_ARP_ORDER)                       /* low to high */
+        for (i = 1; i < n; i++)
+            for (j = i; j > 0 && ns[j - 1] > ns[j]; j--) {
+                uint8_t t = ns[j];
+                ns[j] = ns[j - 1];
+                ns[j - 1] = t;
+            }
+    {
+        int base = n, o;
+        for (o = 1; o < oct; o++)                         /* the octaves above */
+            for (j = 0; j < base && n < 32; j++)
+                if (ns[j] + 12 * o <= 127)
+                    ns[n++] = (uint8_t)(ns[j] + 12 * o);
+    }
+    switch (rc->arp_pat) {
+    case VB_ARP_DOWN: idx = n - 1 - (int)(p->arp_i % (uint32_t)n); break;
+    case VB_ARP_UPDN: {
+        int per = n > 1 ? 2 * n - 2 : 1, k = (int)(p->arp_i % (uint32_t)per);
+        idx = k < n ? k : per - k;
+        break;
+    }
+    case VB_ARP_RND: idx = (int)(vb_rng(&p->rng) % (uint32_t)n); break;
+    default: idx = (int)(p->arp_i % (uint32_t)n); break;
+    }
+    p->arp_i++;
+    note = ns[idx];
+    dur = (uint32_t)PER[rate] * s16 / (rate == 3 ? 2u : 1u);
+    ev_add(p, p->now, note, eplay[2], 1);
+    ev_add(p, p->now + dur * 3u / 4u, note, 0, 0);
+    if (rate == 3) {                                      /* 1/32: a second note half way */
+        int n2 = ns[(idx + 1) % n];
+        p->arp_i++;
+        ev_add(p, p->now + dur, n2, eplay[2], 1);
+        ev_add(p, p->now + dur + dur * 3u / 4u, n2, 0, 0);
+    }
+}
+
 static void on_16th(vb_player_t *p)
 {
     vb_play_t *pl = &p->rc->play;
     uint32_t s16 = p->tick_q8 >> 8;
-    if (pl->mode == VB_PLAY_CHORD) {
+    if (pl->mode == VB_PLAY_ARP) {
+        arp_16th(p);
+    } else if (pl->mode == VB_PLAY_CHORD) {
         if (p->step_left <= 0) {
             const vb_play_t *hp = p->harm && !p->rec ? p->harm : pl;   /* (a print plays its own: REBUILD) */
             int len = clampi(hp->len, 1, VB_CHORD_STEPS);
@@ -301,6 +377,8 @@ static void transport_start(vb_player_t *p)
 {
     p->playing = 1;
     p->n16 = 0;
+    p->arp_i = 0;
+    p->arp_sub = 0;
     p->chord_count = 0;
     p->step = 0;
     p->step_left = 0;
@@ -649,13 +727,36 @@ static void commands(vb_player_t *p)
         p->cmd_r++;
         switch (c >> 24) {
         case C_NOTE_ON:
-            if (!p->rec)                     /* keys don't play into a print: REBUILD must reproduce it */
+            if (p->rc->play.mode == VB_PLAY_ARP) {          /* ARP: a held key feeds the arp */
+                uint32_t k;
+                for (k = 0; k < p->nheld && p->held[k] != a; k++)
+                    ;
+                if (k == p->nheld && p->nheld < 8u) {
+                    if (!p->nheld && !p->playing) {           /* stopped: the arp runs from this key */
+                        p->tick_acc = p->tick_q8;
+                        p->arp_i = 0;
+                        p->arp_sub = 0;
+                    }
+                    p->held[p->nheld++] = (uint8_t)a;
+                }
+            } else if (!p->rec) {            /* keys don't play into a print: REBUILD must reproduce it */
                 voice_on(p, a, b);
+            }
             break;
-        case C_NOTE_OFF: voice_off(p, a); break;
+        case C_NOTE_OFF: {
+            uint32_t k;
+            for (k = 0; k < p->nheld; k++)
+                if (p->held[k] == a) {
+                    p->held[k] = p->held[--p->nheld];
+                    break;
+                }
+            voice_off(p, a);
+            break;
+        }
         case C_PLAY: transport_start(p); break;
         case C_STOP:
             p->playing = 0;
+            p->arp_sub = 0;
             all_off(p);
             break;
         case C_PRINT:
@@ -664,6 +765,7 @@ static void commands(vb_player_t *p)
             break;
         case C_PANIC:
             p->playing = 0;
+            p->nheld = 0;
             p->rec = 0;
             p->nev = 0;
             voices_reset(p);
@@ -684,7 +786,7 @@ void vb_player_render(vb_player_t *p, int32_t *out, int n)
     int32_t *blk = p->block, gain;
     uint32_t v, any = 0;
     int i;
-    if (p->hush >= 2000u && !p->playing && !p->rec && !p->nev && p->cmd_r == p->cmd_w) {
+    if (p->hush >= 2000u && !p->playing && !p->rec && !p->nev && !p->nheld && p->cmd_r == p->cmd_w) {
         for (i = 0; i < n; i++)                  /* asleep (1.5 s of silence, stopped): a note or PLAY wakes it */
             out[i] = 0;
         p->now += (uint32_t)n;
@@ -704,6 +806,12 @@ void vb_player_render(vb_player_t *p, int32_t *out, int n)
             p->tick_acc -= p->tick_q8;
             on_16th(p);
             p->n16++;
+        }
+    } else if (p->nheld && rc->play.mode == VB_PLAY_ARP) {   /* stopped, keys held: the arp on its own clock */
+        p->tick_acc += (uint32_t)n << 8;
+        while (p->tick_acc >= p->tick_q8) {
+            p->tick_acc -= p->tick_q8;
+            arp_16th(p);
         }
     }
     ev_run(p, p->now + (uint32_t)n);

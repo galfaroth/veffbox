@@ -26,7 +26,9 @@ extern const char *const vb_src_name[VB_SRCS];
 #define VB_MODSRC 9                       /* L1..L6, E1..E3 */
 #define VB_PRINT_NP 6                     /* LEN START NORM AFTER TAIL FMT */
 
-enum { VB_PLAY_NOTE, VB_PLAY_SEQ, VB_PLAY_CHORD };
+enum { VB_PLAY_NOTE, VB_PLAY_SEQ, VB_PLAY_CHORD, VB_PLAY_ARP };
+enum { VB_ARP_UP, VB_ARP_DOWN, VB_ARP_UPDN, VB_ARP_RND, VB_ARP_ORDER, VB_ARPS };
+extern const char *const vb_arp_name[VB_ARPS];
 enum { VB_STRUM_UP, VB_STRUM_DOWN, VB_STRUM_ALT, VB_STRUM_RND, VB_STRUM_HARP, VB_STRUM_LUSH, VB_STRUM_ARP, VB_STRUMS };
 extern const char *const vb_strum_name[VB_STRUMS];
 extern const uint8_t vb_len16[12];        /* chord step lengths in sixteenths */
@@ -69,7 +71,8 @@ typedef struct {
     uint32_t seed;
     uint8_t key, scale;                   /* the harmony: KEY (0 = C) and SCALE (VB_SC_*); chords by degree use it */
     uint8_t cin;                          /* CHORD INPUT: 0 NOTES (the keys add notes), 1 DEGREE (the keys play chords) */
-    uint8_t spare[5];                     /* zero; room for new parameters whose 0 keeps the old sound */
+    uint8_t arp_pat, arp_oct, arp_rate;   /* ARP: the pattern (VB_ARP_*), octaves - 1, rate (0 1/16 1 1/8 2 1/4 3 1/32) */
+    uint8_t spare[2];                     /* zero; room for new parameters whose 0 keeps the old sound */
 } vb_recipe_t;
 
 /* parameter addresses: domain << 8 | index */

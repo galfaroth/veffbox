@@ -376,6 +376,36 @@ int main(void)
         pass(3000);
     }
 
+    /* ARP from the keys, its notes out over MIDI (GLO MIDI: NOTES), on the track's channel */
+    {
+        int32_t out[2 * CTL];
+        uint32_t b, k, on60 = 0, on64 = 0, other = 0;
+        boot(1);
+        press_b(B_GLO);
+        ui.row[PG_GLO] = 2;
+        turn(EN_K1, 1);
+        CHECK(vb_nout == 1 && vb_P[0]->note_out, "MIDI: NOTES");
+        RC->play.mode = VB_PLAY_ARP;
+        RC->cin = 0;
+        host_nmout = 0;
+        keyset(7, 1);                                      /* C4 and E4 held */
+        keyset(11, 1);
+        for (b = 0; b < 1378u; b++)                        /* 1 s */
+            vb_audio_block(out, CTL);
+        keyset(7, 0);
+        keyset(11, 0);
+        for (k = 0; k < host_nmout; k++) {
+            uint32_t m = host_mout[k];
+            if ((m & 0xFFFFu) == (0x09u | 0x90u << 8))
+                *(((m >> 16) & 0x7Fu) == 60u ? &on60 : ((m >> 16) & 0x7Fu) == 64u ? &on64 : &other) += 1u;
+        }
+        CHECK(on60 >= 3 && on64 >= 3 && !other, "ARP C4 E4 out on channel 1: %u x C4, %u x E4, %u others", on60, on64, other);
+        vb_nout = 0;
+        nout_bind();
+        RC->play.mode = VB_PLAY_CHORD;
+        pass(3000);
+    }
+
     /* SYNC OUT: START, 24 ticks a quarter at the tempo; SYNC IN: a clock at 125 BPM is followed, tempo and phase */
     {
         int32_t out[2 * CTL];

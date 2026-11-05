@@ -7,6 +7,7 @@
 #include "vb_chop.h"
 
 const char *const vb_src_name[VB_SRCS] = {"OP4", "ANLG", "DRUM", "SAMP", "GRAN", "CHOP"};
+const char *const vb_arp_name[VB_ARPS] = {"UP", "DOWN", "UP-DN", "RND", "ORDER"};
 const char *const vb_strum_name[VB_STRUMS] = {"UP", "DOWN", "ALT", "RND", "HARP", "LUSH", "ARP"};
 const uint8_t vb_len16[12] = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64};
 const char *const vb_len_name[12] = {"1/16", "1/8", "3/16", "1/4", "3/8", "1/2", "3/4", "1 BAR", "1.5BR", "2 BAR",
