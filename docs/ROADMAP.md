@@ -10,7 +10,7 @@ The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in t
 1. ~~Chords by degree (I, III ...), entered HiChord / Orchid style, jamming with them~~: done in 0.4.0.
 2. ~~Several tracks at once~~: done in 0.5.0.
 3. ~~Chords per track or global~~: done in 0.6.0.
-4. **Play in sync**: MIDI clock in and out.
+4. ~~Play in sync~~: done in 0.7.0.
 5. **A built-in library** of sources and effects to browse and add (a few character sounds: rubbery basses, latex
    plucks, metallic hits).
 6. **Magic arp**: an arpeggiator that follows the chord playing (the step, or the pad), with the number of octaves;
@@ -51,6 +51,9 @@ The order agreed before:
 
 ## Done
 
+- 0.7.0: SYNC on GLO. OUT: MIDI clock over USB from the audio thread (24 a quarter, START / STOP with PLAY). IN:
+  START / STOP / CONTINUE run the tracks; the tempo from the ticks' times over each beat; at every sixteenth the phase
+  is pulled half way to the clock's (host test: 125 BPM followed exactly, in phase after 20 s).
 - 0.6.0: CHORDS on GLO: OWN, or every track in CHORD plays T1..T4's progression in step with its own sound, strum
   and voices; that track's PLAY page edits the source's chords; RESAMPLE copies them into the recipe (REBUILD stays exact).
 - 0.5.0: four tracks at once. A player per track, mixed, PLAY / STOP for all; the selected track holds the FX
