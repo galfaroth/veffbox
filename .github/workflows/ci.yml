@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Every push to staging: the FM-1 package built on GitHub (zvenson/fm1-build) and the host tests. The package is the
+# run's artifact "packages", for testing on an FM-1 before the daily release takes it to main.
+name: ci
+on:
+  push:
+    branches: [staging]
+  pull_request:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  build:
+    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      build: bash tools/ci_build.sh
+      packages: dist/veffbox-*.fwsc
+      test: bash tools/ci_test.sh

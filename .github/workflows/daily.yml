@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Once a day: when staging has new commits and its CI run is green, main moves to staging, the version gets a tag
+# (VERSION.txt, or the next patch number if that one is released already) and release.yml builds the release.
+# 09:00 UTC is 10:00 in Poland in winter (CET) and 11:00 in summer (CEST).
+name: daily release
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: daily-release
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - run: bash tools/daily_release.sh

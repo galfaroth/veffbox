@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# Publishes site/ (the landing page, the emulator, the mockup, the web installer and the current package) to GitHub Pages.
+# Publishes site/ to GitHub Pages: the landing page, the emulator (built here from this commit), the mockup, and the web
+# installer with the newest release's package (tools/make_site.py). release.yml starts it after each release.
 name: pages
 on:
   push:
@@ -21,6 +22,23 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # the newest release's package and the emulator built from this commit (the same as that release's source)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: The package, the installer and the emulator
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m pip install --quiet Pillow numpy
+          git clone --quiet --depth 1 --branch v1.0.1 https://github.com/galfaroth/mnm1.git ../mnm
+          (cd ../mnm && python3 tools/build.py --gen-only)
+          make emu MNM=../mnm
+          tag="$(gh release view --json tagName --jq .tagName)"
+          mkdir -p ../pkg
+          gh release download "$tag" --pattern '*.fwsc' --dir ../pkg
+          python3 tools/make_site.py ../pkg/veffbox-${tag#v}.fwsc --mnm ../mnm --version "${tag#v}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

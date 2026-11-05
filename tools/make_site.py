@@ -82,13 +82,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pkg")
     ap.add_argument("--mnm", default=str(ROOT.parent), help="the MNM-1 tree (its web/ and LICENSES/)")
+    ap.add_argument("--version", help="the package's version (default: VERSION.txt)")
     a = ap.parse_args()
     pkg, mnm = Path(a.pkg), Path(a.mnm)
     raw = pkg.read_bytes()
     product = product_of(raw)
     if product != "FM-1_62000100" or b"FELUCCA-LOADER-1" not in raw:
         raise SystemExit(f"{pkg}: identity {product!r}; expected FM-1_62000100 with the Felucca loader")
-    version = (ROOT / "VERSION.txt").read_text().strip()
+    version = a.version or (ROOT / "VERSION.txt").read_text().strip()
     name = f"veffbox-{version}.fwsc"
     site = ROOT / "site"
     inst, fw = site / "install", site / "firmware"
@@ -108,6 +109,12 @@ def main():
                                     + "</ul>\n", encoding="utf-8")
     info = {"version": version, "product": product, "pkg": "../firmware/" + name}
     (inst / "index.html").write_text(installer(mnm / "web", info), encoding="utf-8")
+    page = site / "index.html"                   # the landing page names the current version and its package
+    t = page.read_text(encoding="utf-8")
+    t2 = re.sub(r"Firmware \d+\.\d+\.\d+", f"Firmware {version}", t)
+    t2 = re.sub(r"firmware/veffbox-\d+\.\d+\.\d+\.fwsc", f"firmware/{name}", t2)
+    if t2 != t:
+        page.write_text(t2, encoding="utf-8")
     (site / ".nojekyll").write_text("")
     print(f"site: install/ ({product} {version}), firmware/{name}")
 

@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# A release for a tag vX.Y.Z: the package built and attested on GitHub (zvenson/fm1-build, so the Firmware Hub shows
+# "Built from source"), then the zip (package + licences + README), the notes (the commits since the last release),
+# and the site rebuilt with the new package. The daily release (daily.yml) starts it; a tag pushed by hand does too.
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions: {}
+jobs:
+  build:
+    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      build: bash tools/ci_build.sh
+      packages: dist/veffbox-*.fwsc
+      test: bash tools/ci_test.sh
+  zip:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: pkg
+      - name: The zip
+        run: |
+          git clone --quiet --depth 1 --branch v1.0.1 https://github.com/galfaroth/mnm1.git ../mnm
+          python3 tools/make_zip.py "pkg/dist/veffbox-${TAG#v}.fwsc" --mnm ../mnm
+          gh release upload "$TAG" "pkg/dist/veffbox-${TAG#v}.zip" --clobber
+      - name: The notes
+        run: |
+          prev="$(git describe --tags --abbrev=0 --match 'v*' "$TAG^" 2>/dev/null || true)"
+          {
+            echo "Veffbox ${TAG#v} for the M-VAVE FM-1 (identity FM-1_62000100)."
+            echo
+            echo "Install: https://galfaroth.github.io/veffbox/install/ (Chrome or Edge, USB), or any installer that takes .fwsc."
+            echo "Try it in the browser first: https://galfaroth.github.io/veffbox/"
+            echo
+            echo "**Changes**"
+            echo
+            git log --no-merges --format='- %s' ${prev:+$prev..}"$TAG" | grep -v -E '^- Veffbox [0-9.]+$' || true
+            echo
+            echo "veffbox-${TAG#v}.zip: the package, the licence texts and a README. Built from this tag on GitHub; check it with"
+            echo "\`gh attestation verify veffbox-${TAG#v}.fwsc --repo galfaroth/veffbox --signer-workflow zvenson/fm1-build/.github/workflows/build.yml\`"
+          } > notes.md
+          gh release edit "$TAG" --title "Veffbox ${TAG#v}" --notes-file notes.md
+      - name: The site, with the new package
+        run: gh workflow run pages.yml --ref main
