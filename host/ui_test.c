@@ -24,6 +24,13 @@ static void sel(void)                                      /* a SEL tap: press, 
     host_rel |= 1u << panel.btn[B_SCL];
     pass(40);
 }
+static void keyset(uint32_t n, int on)                    /* a key down / up, and a block of audio (it takes the notes) */
+{
+    int32_t o[32];
+    fm1_in.notes = on ? fm1_in.notes | 1u << n : fm1_in.notes & ~(1u << n);
+    pass(40);
+    vb_player_render(&vb_pl, o, 32);
+}
 static void turn(uint32_t e, int d) { host_enc[panel.enc[e]] += d * panel.dir[e]; pass(40); }
 static void boot(int fresh)
 {
@@ -181,6 +188,64 @@ int main(void)
     pass(3000);
     boot(0);
     CHECK(vb_bank[vb_track_sound[1]].play.vel == 33, "track 2's edit after a restart (%u)", vb_bank[vb_track_sound[1]].play.vel);
+
+    /* CHORD INPUT DEGREE: the keys are a chord pad; on PLAY, stopped, each chord also fills the selected step */
+    {
+        vb_play_t *p2;
+        char b[24];
+        press_b(B_ARP);
+        if (vb_pl.playing)
+            press_b(B_PLAY);
+        p2 = &RC->play;
+        p2->mode = VB_PLAY_CHORD;
+        RC->cin = 1;
+        RC->key = 0;
+        RC->scale = VB_SC_MAJ;
+        p2->len = 4;
+        p2->sel = 0;
+        for (int k = 0; k < 4; k++)
+            p2->chord[k].voi = VB_VOI_CLOSE;
+        ui.oct = 2;
+        pass(40);
+        keyset(0, 1);                                      /* F3 held: 7 */
+        keyset(7, 1);                                      /* C4: I */
+        keyset(7, 0);
+        keyset(0, 0);
+        vb_chord_roman(&p2->chord[0], 0, VB_SC_MAJ, b, sizeof b);
+        CHECK(!strcmp(b, "Imaj7") && p2->sel == 1, "pad C4 + 7: %s, next step %u", b, p2->sel);
+        keyset(16, 1);                                     /* A4: vi */
+        keyset(16, 0);
+        vb_chord_roman(&p2->chord[1], 0, VB_SC_MAJ, b, sizeof b);
+        CHECK(!strcmp(b, "VIm"), "pad A4: %s", b);
+        keyset(9, 1);                                      /* D4, then SWAP while it is held: II */
+        keyset(2, 1);
+        keyset(2, 0);
+        keyset(9, 0);
+        vb_chord_roman(&p2->chord[2], 0, VB_SC_MAJ, b, sizeof b);
+        CHECK(!strcmp(b, "II") && p2->sel == 3, "pad D4 + SWAP after: %s (one step, sel %u)", b, p2->sel);
+        keyset(17, 1);                                     /* A#4: bVII */
+        keyset(17, 0);
+        vb_chord_roman(&p2->chord[3], 0, VB_SC_MAJ, b, sizeof b);
+        CHECK(!strcmp(b, "bVII") && p2->sel == 0, "pad A#4: %s, wraps to step %u", b, p2->sel);
+        RC->key = 9;
+        RC->scale = VB_SC_MIN;
+        press_b(B_PLAY);                                   /* playing: the pad plays, the steps stay */
+        {
+            int32_t o[32];
+            vb_player_render(&vb_pl, o, 32);                   /* (the audio side takes the command) */
+        }
+        CHECK(vb_pl.playing, "playing");
+        keyset(14, 1);                                     /* G4: v of A minor */
+        keyset(14, 0);
+        vb_chord_roman(&p2->chord[0], 0, VB_SC_MAJ, b, sizeof b);
+        CHECK(!strcmp(b, "Imaj7"), "playing: step 1 kept (%s)", b);
+        press_b(B_PLAY);
+        {
+            int32_t o[32];
+            vb_player_render(&vb_pl, o, 32);
+        }
+        RC->cin = 0;
+    }
 
     printf(failures ? "\n%d FAILED\n" : "\nall ui tests passed\n", failures);
     return failures != 0;

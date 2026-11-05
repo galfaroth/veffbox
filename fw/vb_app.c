@@ -520,7 +520,7 @@ typedef struct {
     vb_addr_t addr;                                        /* modulation destination (VB_ADDR_NONE: none) */
     uint8_t arg;
 } cell_t;
-#define NROWS 6
+#define NROWS 7
 static cell_t C[NROWS][4];
 static uint32_t NR;
 
@@ -561,6 +561,7 @@ static const char *const FMT_N[2] = {"PCM", "ADPCM"};
 static const char *const DO_N[4] = {"LOAD", "EDIT", "RBLD", "COPY"};
 static const char *const SONGDO_N[2] = {"LOAD", "SAVE"};
 static const char *const CACT_N[3] = {"INS", "DUP", "DEL"};
+static const char *const CIN_N[2] = {"NOTES", "DEGREE"};
 static const char *const SACT_N[4] = {"ON/OFF", "INS", "DUP", "DEL"};
 static const char *const SAMP_LBL[8] = {"START", "LEN", "LOOP", "REV", "PITCH", "FINE", "FADE", "GAIN"};
 static const char *const SAMP_LOOP_N[3] = {"OFF", "FWD", "P-P"};
@@ -650,7 +651,10 @@ static void build_rows(void)
             }
             cl(5, 0, "VEL", K_U8, F_NUM, &pl->vel, 1, 127, 0, VB_ADDR(VB_D_PLAY, 2), 0);
             cl(5, 1, "SPRD", K_U8, F_NUM, &pl->sprd, 0, 127, 0, VB_ADDR(VB_D_PLAY, 3), 0);
-            NR = 6;
+            cl(6, 0, "INPUT", K_U8, F_LIST, &RC->cin, 0, 1, CIN_N, VB_ADDR_NONE, 0);
+            cl(6, 1, "KEY", K_U8, F_LIST, &RC->key, 0, 11, NOTE_NM, VB_ADDR_NONE, 0);
+            cl(6, 2, "SCALE", K_U8, F_LIST, &RC->scale, 0, VB_SCALES - 1, vb_scale_name, VB_ADDR_NONE, 0);
+            NR = 7;
         } else if (pl->mode == VB_PLAY_SEQ) {
             vb_step_t *st = &pl->seq[pl->sel % VB_SEQ_STEPS];
             cl(1, 0, "NOTE", K_U8, F_NOTE, &st->note, 24, 108, 0, VB_ADDR_NONE, 0);
@@ -1398,10 +1402,88 @@ static void press(uint32_t b)
 }
 
 static uint32_t keys_held;
+
+/* CHORD with INPUT DEGREE: the keys are a chord pad, on every page. C4..B4 play the degrees I..VII of KEY / SCALE,
+ * C5..G5 I..V an octave up; the black keys from C#4 major chords on bII bIII bV bVI bVII (an octave up from C#5).
+ * F3..B3 held with them: 7, 6, SWAP (major <-> minor), SUS2, SUS4, DIM, 9; pressed while a chord is held, they change
+ * it (letting go of them does not). On PLAY, stopped, each chord is also
+ * written into the selected step, and the next step is selected. */
+static const int8_t PAD[27] = {-1, -1, -1, -1, -1, -1, -1,                      /* F3..B3: the modifiers */
+                               0, 11, 1, 13, 2, 3, 16, 4, 18, 5, 20, 6,          /* C4..B4 (10 + semis: borrowed) */
+                               32, 43, 33, 45, 34, 35, 48, 36};                  /* C5..G5 (+ 32: an octave up) */
+static const uint8_t PAD_MOD[7] = {VB_CM_7, VB_CM_6, VB_CM_SWAP, VB_CM_SUS2, VB_CM_SUS4, VB_CM_DIM, VB_CM_9};
+static struct { int8_t key, step; uint8_t n, note[VB_CHORD_NOTES + 1]; } jam = {-1, -1, 0, {0}};
+
+static void jam_off(void)
+{
+    uint32_t i;
+    for (i = 0; i < jam.n; i++)
+        vb_player_note(&vb_pl, jam.note[i], 0, 0);
+    jam.n = 0;
+}
+static void jam_on(uint32_t n)
+{
+    vb_play_t *pl = &RC->play;
+    int p = PAD[n], deg = (p & 31) < 10 ? p & 31 : -1, semis = (p & 31) - 10, root, type, mods = 0;
+    int base = 48 + 12 * ((int)ui.oct - 2) + (p & 32 ? 12 : 0);
+    uint32_t i;
+    vb_chord_t c, *dst;
+    for (i = 0; i < 7u; i++)
+        if ((fm1_in.notes >> i) & 1u)
+            mods |= PAD_MOD[i];
+    type = vb_degree_chord(RC->key, RC->scale, deg, semis, mods, &root);
+    jam_off();
+    dst = 0;
+    if (ui.page == PG_PLAY && !vb_pl.playing) {           /* write: the step played last time if the chord changes */
+        uint32_t s = jam.key >= 0 && jam.step >= 0 ? (uint32_t)jam.step : pl->sel % VB_CHORD_STEPS;
+        dst = &pl->chord[s];
+        if (jam.key < 0 || jam.step < 0) {
+            jam.step = (int8_t)s;
+            pl->sel = (uint8_t)((s + 1u) % (pl->len ? pl->len : 1u));
+        }
+    }
+    c = dst ? *dst : pl->chord[pl->sel % VB_CHORD_STEPS];
+    vb_chord_fill(&c, root, type, base);
+    if (dst) {
+        *dst = c;
+        touch();
+        ui.d_vis = ui.d_prm = 1;
+    }
+    for (i = 0; i < c.n; i++)
+        jam.note[jam.n++] = c.note[i];
+    if (vb_chord_bass(&c))
+        jam.note[jam.n++] = (uint8_t)vb_chord_bass(&c);
+    for (i = 0; i < jam.n; i++)
+        vb_player_note(&vb_pl, jam.note[i], pl->vel, 1);
+    jam.key = (int8_t)n;
+}
+static void chord_pad(uint32_t n, int down)
+{
+    if (n >= 27u)
+        return;
+    if (PAD[n] < 0) {                                      /* a modifier pressed: the held chord changes with it */
+        if (down && jam.key >= 0)
+            jam_on((uint32_t)jam.key);
+        return;
+    }
+    if (down) {
+        jam.step = -1;
+        jam.key = -1;
+        jam_on(n);
+    } else if ((int)n == jam.key) {
+        jam_off();
+        jam.key = jam.step = -1;
+    }
+}
+
 static void key(uint32_t n, int down)
 {
     int note = 53 + (int)n + 12 * ((int)ui.oct - 2);       /* key 0 = F3 at OCT 0 */
     vb_play_t *pl = &RC->play;
+    if (pl->mode == VB_PLAY_CHORD && RC->cin) {
+        chord_pad(n, down);
+        return;
+    }
     if (!down) {
         vb_player_note(&vb_pl, note, 0, 0);
         return;
@@ -1939,10 +2021,12 @@ static void vis_play(void)
                 sc--;
             md_text(8, 58 + (int32_t)(5u - sc) * 5 / 2, &MD_F3, sc, t, C_INK);
         }
+        vb_chord_roman(&pl->chord[pl->sel % VB_CHORD_STEPS], RC->key, RC->scale, t, sizeof t);   /* the degree in KEY */
+        md_text(150, 52, &MD_F3, md_text_w(&MD_F3, 2, t) > 86 ? 1 : 2, t, C_INK);
         str_cpy(t, vb_len_name[pl->chord[pl->sel].len_i % 12u], sizeof t);
-        md_text(150, 60, &MD_F3, 2, t, C_INK);
+        md_text(150, 68, &MD_F3, 2, t, C_INK);
         str_cpy(t, vb_strum_name[pl->strum], sizeof t);
-        md_text(150, 76, &MD_F3, 2, t, C_INK);
+        md_text(150, 84, &MD_F3, 2, t, C_INK);
         {   /* the BASS, then the notes */
             const vb_chord_t *ch = &pl->chord[pl->sel % VB_CHORD_STEPS];
             char ln[64], nn[6];
@@ -1959,7 +2043,7 @@ static void vis_play(void)
                 cat(ln, nn, sizeof ln);
             }
             if (!ch->n)
-                str_cpy(ln, "KEYS ADD NOTES", sizeof ln);
+                str_cpy(ln, RC->cin ? "C4-B4: CHORDS I-VII" : "KEYS ADD NOTES", sizeof ln);
             {
                 uint32_t sc = 2;
                 if (md_text_w(&MD_F3, 2, ln) > 228)

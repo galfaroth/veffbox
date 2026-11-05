@@ -167,17 +167,17 @@ void vb_chord_voice(vb_chord_t *c, int v)
     c->voi = (uint8_t)v;
 }
 
-int vb_chord_name(const vb_chord_t *c, char *out, int max)
+/* the root and type the notes make (the lowest note's class tried first as the root); 0 when no type matches */
+static int chord_ident(const vb_chord_t *c, int *root, int *type)
 {
-    int lo = 127, i, k, r;
+    int i, k, r;
     uint32_t pcs = 0;
-    if (!c->n)
-        return vb_strcpy(out, "-", max);
+    int lo = 127;
     for (i = 0; i < c->n; i++) {
         lo = c->note[i] < lo ? c->note[i] : lo;
         pcs |= 1u << (c->note[i] % 12);
     }
-    for (k = -1; k < 12; k++) {                      /* the bass note's class first, then any root */
+    for (k = -1; k < 12 && c->n > 1; k++) {
         r = k < 0 ? lo % 12 : k;
         if (!((pcs >> r) & 1u))
             continue;
@@ -190,15 +190,33 @@ int vb_chord_name(const vb_chord_t *c, char *out, int max)
                 if ((pcs >> j) & 1u)
                     set |= 1u << ((j - r + 12) % 12);
             if (set == tp) {
-                int at = vb_strcpy(out, NOTE_NAME[r], max);
-                at = vb_cat(out, at, CHORD_SUFFIX[i], max);
-                if (r != lo % 12) {
-                    at = vb_cat(out, at, "/", max);
-                    at = vb_cat(out, at, NOTE_NAME[lo % 12], max);
-                }
-                return at;
+                *root = r;
+                *type = i;
+                return 1;
             }
         }
+    }
+    return 0;
+}
+
+int vb_chord_name(const vb_chord_t *c, char *out, int max)
+{
+    int lo = 127, i, r, ty;
+    uint32_t pcs = 0;
+    if (!c->n)
+        return vb_strcpy(out, "-", max);
+    for (i = 0; i < c->n; i++) {
+        lo = c->note[i] < lo ? c->note[i] : lo;
+        pcs |= 1u << (c->note[i] % 12);
+    }
+    if (chord_ident(c, &r, &ty)) {
+        int at = vb_strcpy(out, NOTE_NAME[r], max);
+        at = vb_cat(out, at, CHORD_SUFFIX[ty], max);
+        if (r != lo % 12) {
+            at = vb_cat(out, at, "/", max);
+            at = vb_cat(out, at, NOTE_NAME[lo % 12], max);
+        }
+        return at;
     }
     if (c->n == 1) {
         int at = vb_strcpy(out, NOTE_NAME[lo % 12], max);
@@ -465,4 +483,98 @@ int vb_addr_list(const vb_recipe_t *r, vb_addr_t *out, int max)
             ADD(VB_ADDR(VB_D_MOD, i * 8 + k));
 #undef ADD
     return n;
+}
+
+/* ---- harmony */
+const char *const vb_scale_name[VB_SCALES] = {"MAJOR", "MINOR", "DORIAN", "PHRYG", "LYDIAN", "MIXO", "LOCRIAN",
+                                              "HARM M", "MEL M"};
+const uint8_t vb_scale_iv[VB_SCALES][7] = {
+    {0, 2, 4, 5, 7, 9, 11}, {0, 2, 3, 5, 7, 8, 10}, {0, 2, 3, 5, 7, 9, 10}, {0, 1, 3, 5, 7, 8, 10},
+    {0, 2, 4, 6, 7, 9, 11}, {0, 2, 4, 5, 7, 9, 10}, {0, 1, 3, 5, 6, 8, 10}, {0, 2, 3, 5, 7, 8, 11},
+    {0, 2, 3, 5, 7, 9, 11},
+};
+enum { T_MAJ, T_MIN, T_7, T_MAJ7, T_MIN7, T_SUS2, T_SUS4, T_ADD9, T_MIN9, T_DIM, T_5, T_6, T_MIN6, T_69, T_MAJ9,
+       T_9, T_MIN11, T_7SUS4, T_MAJ7S11, T_M7B5, T_AUG, T_MADD9 };
+
+int vb_degree_chord(int key, int scale, int deg, int semis, int mods, int *root_pc)
+{
+    const uint8_t *s = vb_scale_iv[scale % VB_SCALES];
+    int third = 4, fifth = 7, sev = 10, minor, dim, aug;
+    if (deg >= 0) {
+        deg %= 7;
+        third = (s[(deg + 2) % 7] - s[deg] + 12) % 12;
+        fifth = (s[(deg + 4) % 7] - s[deg] + 12) % 12;
+        sev = (s[(deg + 6) % 7] - s[deg] + 12) % 12;
+        semis = s[deg];
+    }
+    *root_pc = ((key + semis) % 12 + 12) % 12;
+    minor = third == 3;
+    dim = fifth == 6;
+    aug = fifth == 8;
+    if (mods & VB_CM_SWAP) {                       /* major <-> minor; a dim or aug chord becomes plain minor or major */
+        if (dim || aug)
+            dim = aug = 0;
+        else
+            minor = !minor;
+        sev = 10;                                  /* and the 7th a dominant / minor one (II7: the secondary dominant) */
+    }
+    if (mods & VB_CM_DIM) {
+        dim = minor = 1;
+        aug = 0;
+    }
+    if (mods & VB_CM_SUS4)
+        return mods & VB_CM_7 ? T_7SUS4 : T_SUS4;
+    if (mods & VB_CM_SUS2)
+        return T_SUS2;
+    if (dim)
+        return mods & VB_CM_7 ? T_M7B5 : T_DIM;
+    if (aug)
+        return T_AUG;
+    if (minor) {
+        if (mods & VB_CM_6)
+            return T_MIN6;
+        if (mods & VB_CM_7)
+            return mods & VB_CM_9 ? T_MIN9 : T_MIN7;
+        return mods & VB_CM_9 ? T_MADD9 : T_MIN;
+    }
+    if (mods & VB_CM_6)
+        return mods & VB_CM_9 ? T_69 : T_6;
+    if (mods & VB_CM_7) {
+        if (sev == 11)
+            return mods & VB_CM_9 ? T_MAJ9 : T_MAJ7;
+        return mods & VB_CM_9 ? T_9 : T_7;
+    }
+    return mods & VB_CM_9 ? T_ADD9 : T_MAJ;
+}
+
+int vb_chord_roman(const vb_chord_t *c, int key, int scale, char *out, int max)
+{
+    static const char *const RN[7] = {"I", "II", "III", "IV", "V", "VI", "VII"};
+    const uint8_t *s = vb_scale_iv[scale % VB_SCALES];
+    int r, ty, iv, d, at;
+    if (!c->n)
+        return vb_strcpy(out, "-", max);
+    if (!chord_ident(c, &r, &ty)) {
+        r = c->root % 12;
+        ty = -1;
+    }
+    iv = ((r - key) % 12 + 12) % 12;
+    for (d = 0; d < 7 && s[d] != iv; d++)
+        ;
+    if (d < 7)
+        at = vb_strcpy(out, RN[d], max);
+    else {                                         /* not in the scale: a flat on the degree above it */
+        for (d = 0; d < 7 && s[d] != (iv + 1) % 12; d++)
+            ;
+        if (d < 7) {
+            at = vb_strcpy(out, "b", max);
+            at = vb_cat(out, at, RN[d], max);
+        } else {                                   /* (a scale with a gap of 3: a sharp on the one below) */
+            for (d = 0; d < 7 && s[d] != (iv + 11) % 12; d++)
+                ;
+            at = vb_strcpy(out, "#", max);
+            at = vb_cat(out, at, RN[d % 7], max);
+        }
+    }
+    return vb_cat(out, at, ty >= 0 ? CHORD_SUFFIX[ty] : "?", max);
 }

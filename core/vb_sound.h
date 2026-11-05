@@ -67,7 +67,9 @@ typedef struct {
     uint8_t pnote;                        /* the note a NOTE print plays (the last key) */
     uint16_t bpm10;                       /* the tempo at the print: a REBUILD renders at it */
     uint32_t seed;
-    uint8_t spare[8];                     /* zero; room for new parameters whose 0 keeps the old sound */
+    uint8_t key, scale;                   /* the harmony: KEY (0 = C) and SCALE (VB_SC_*); chords by degree use it */
+    uint8_t cin;                          /* CHORD INPUT: 0 NOTES (the keys add notes), 1 DEGREE (the keys play chords) */
+    uint8_t spare[5];                     /* zero; room for new parameters whose 0 keeps the old sound */
 } vb_recipe_t;
 
 /* parameter addresses: domain << 8 | index */
@@ -95,6 +97,18 @@ void vb_addr_set(vb_recipe_t *r, vb_addr_t a, int v);
 void vb_addr_name(const vb_recipe_t *r, vb_addr_t a, char *out, int max);
 /* every modulatable address for the current source and chain, in display order; returns the count */
 int vb_addr_list(const vb_recipe_t *r, vb_addr_t *out, int max);
+
+/* harmony: scales, chords on a scale degree, roman numerals */
+enum { VB_SC_MAJ, VB_SC_MIN, VB_SC_DOR, VB_SC_PHR, VB_SC_LYD, VB_SC_MIX, VB_SC_LOC, VB_SC_HMIN, VB_SC_MMIN, VB_SCALES };
+extern const char *const vb_scale_name[VB_SCALES];
+extern const uint8_t vb_scale_iv[VB_SCALES][7];
+/* chord modifiers, held with a degree (VB_CM_*); a few make sense together (7 + 9, 6 + 9, SWAP + 7) */
+enum { VB_CM_7 = 1, VB_CM_6 = 2, VB_CM_SWAP = 4, VB_CM_SUS2 = 8, VB_CM_SUS4 = 16, VB_CM_DIM = 32, VB_CM_9 = 64 };
+/* the chord type on degree deg (0..6) of the scale, or with deg < 0 a major chord on the root `semis` above the key
+ * (a borrowed chord: bIII, bVII ...), changed by the modifiers mods; *root_pc gets the root's pitch class */
+int vb_degree_chord(int key, int scale, int deg, int semis, int mods, int *root_pc);
+/* the chord's roman numeral in key / scale, in the chord names' style: "I", "IIm7", "V7", "bVIImaj7"; returns length */
+int vb_chord_roman(const vb_chord_t *c, int key, int scale, char *out, int max);
 
 /* chord helpers */
 void vb_chord_fill(vb_chord_t *c, int root, int type, int base_note);
