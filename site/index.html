@@ -602,8 +602,8 @@ document.getElementById('firstSound').addEventListener('click', () => { document
       <span class="num">03 · Play</span>
       <h2 id="chord-title">Chords with exact notes.<br>Steps with their own length.</h2>
       <p class="lead">Three play modes: <b>NOTE</b> from the keys, <b>SEQ</b> as a 16-step line with slides and
-        probability, and <b>CHORD</b>: 8 steps, each holding up to 6 exact notes and its own length, from a sixteenth to
-        four bars. Press a key to add or remove a note; the chord name is recognized for you.</p>
+        probability, and <b>CHORD</b>: up to 16 steps, each holding up to 8 exact notes and its own length, from a sixteenth
+        to four bars. Press a key to add or remove a note; the chord name is recognized for you.</p>
     </div>
 
     <div class="roll">
@@ -620,6 +620,14 @@ document.getElementById('firstSound').addEventListener('click', () => { document
     <p class="note">Per step: <b>ROOT</b> moves the whole voicing, <b>TYPE</b> fills it from 11 templates (MAJ, MIN, 7, MAJ7,
       MIN7, SUS2, SUS4, ADD9, MIN9, DIM, 5), <b>N1–N4</b> set single pitches, <b>LEN</b> runs 1/16, 1/8, 3/16, 1/4, 3/8, 1/2,
       3/4, 1, 1½, 2, 3 or 4 bars, and <b>GATE</b> sets how long the notes ring inside the step.</p>
+
+    <h3 class="sub-h">Or play them by degree.</h3>
+    <p class="sub-p">Set <b>INPUT</b> to <b>DEGREE</b> and pick a <b>KEY</b> and a <b>SCALE</b> (major, minor, the modes,
+      harmonic and melodic minor): the keys become a chord pad, on every page. C4–B4 play the chords on I–VII, C5–G5 the
+      same an octave up, and the black keys major chords on ♭II, ♭III, ♭V, ♭VI and ♭VII. Hold F3–B3 with them for 7, 6,
+      SWAP (major ↔ minor, so II7 is the secondary dominant), SUS2, SUS4, DIM and 9. On PLAY, while stopped, each chord
+      also fills the selected step and moves on to the next, so a progression goes in as fast as you can play it. The
+      screen shows each chord's roman numeral.</p>
 
     <h3 class="sub-h">Seven ways to strum.</h3>
     <p class="sub-p"><b>TIME</b> sets the gap between strummed notes (0–250&nbsp;ms) and <b>HUMAN</b> adds timing and velocity

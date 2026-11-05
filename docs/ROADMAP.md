@@ -5,6 +5,25 @@ and screenshots of the new screens (`make shots`).
 
 ## Next
 
+The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in this order:
+
+1. ~~Chords by degree (I, III ...), entered HiChord / Orchid style, jamming with them~~: done in 0.4.0.
+2. **Magic arp**: an arpeggiator that follows the chord playing (the step, or the pad), with the number of octaves;
+   also out over MIDI.
+3. **Notes and melodies**: enter a pool of notes (with the number of octaves) and a melody in order; RANDOMIZE it in
+   groups of three or four.
+4. **Tap the rhythm**: tapping any key plays the next note or chord of the melody / progression, as you tap (one-key
+   play), and records it.
+5. **Chords per track or global**: one progression for all tracks, or each track its own (with 6 below).
+6. **Several tracks at once** (item 2 of the old order below).
+7. **Play in sync**: MIDI clock in and out.
+8. **A built-in library** of sources and effects to browse and add (a few character sounds: rubbery basses, latex
+   plucks, metallic hits).
+9. **A plugin version** for computers: the core is portable C, so a CLAP / VST3 plugin around it (VST.NET was
+   suggested; a C/C++ wrapper would reuse the code directly).
+
+The order agreed before:
+
 2. **Four tracks sounding at once.** The background tracks get only FX that need no buffer, because RAM is nearly full:
    95.7 of 96 KiB, and the pool has 14 KiB free.
 3. **Sidechain on the device**, as in the mockup:
@@ -34,6 +53,9 @@ and screenshots of the new screens (`make shots`).
 
 ## Done
 
+- 0.4.0: chords by degree. KEY, SCALE (9 scales) and CHORD INPUT DEGREE: the keys are a chord pad on every page
+  (C4..B4 I..VII, C5..G5 an octave up, the black keys bII bIII bV bVI bVII; F3..B3 held: 7 6 SWAP SUS2 SUS4 DIM 9); on PLAY,
+  stopped, each chord fills the selected step; the roman numeral on the screen.
 - Tested with the official V15 on the FM-1 (2026-11-04): Veffbox 0.3.2 -> V15 (the hub's file, SHA-256 db1642b2..., the
   FM-1 reported FM-1_015), then V15 -> the 0.3.2 release file (dccb1783...), FM-1_62000100, keys and sound fine.
 - 0.3.1: CHOP SPLIT: TRANS (the transients, SENS) or EVEN (SLICES equal parts, 2..64); the screen marks the cuts
