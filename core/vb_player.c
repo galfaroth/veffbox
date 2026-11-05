@@ -268,10 +268,11 @@ static void on_16th(vb_player_t *p)
     uint32_t s16 = p->tick_q8 >> 8;
     if (pl->mode == VB_PLAY_CHORD) {
         if (p->step_left <= 0) {
-            int len = clampi(pl->len, 1, VB_CHORD_STEPS);
+            const vb_play_t *hp = p->harm && !p->rec ? p->harm : pl;   /* (a print plays its own: REBUILD) */
+            int len = clampi(hp->len, 1, VB_CHORD_STEPS);
             const vb_chord_t *c;
             p->step = (uint8_t)(p->chord_count ? (p->step + 1) % len : 0);
-            c = &pl->chord[p->step];
+            c = &hp->chord[p->step];
             p->step_left = vb_len16[c->len_i % 12u];
             sched_chord(p, c, (uint32_t)p->step_left * s16);
             p->chord_count++;

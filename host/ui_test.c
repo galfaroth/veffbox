@@ -313,6 +313,43 @@ int main(void)
         vb_tmute[2] = 0;
     }
 
+    /* CHORDS on GLO: every track in CHORD plays T1's progression, in step; its PLAY page edits T1's */
+    {
+        int32_t out[2 * CTL];
+        uint32_t b;
+        vb_recipe_t *r1, *r4;
+        boot(1);
+        r1 = snd(vb_track_sound[0]);
+        r4 = snd(vb_track_sound[3]);
+        r4->play.mode = VB_PLAY_CHORD;
+        r4->play.len = 2;                                  /* its own: two steps of A minor */
+        vb_chord_fill(&r4->play.chord[0], 9, 1, 48);
+        vb_chord_fill(&r4->play.chord[1], 9, 1, 48);
+        press_b(B_GLO);
+        ui.row[PG_GLO] = 0;
+        turn(EN_K3, 1);                                    /* CHORDS: T1 */
+        CHECK(vb_hsrc == 1 && vb_P[3]->harm == &r1->play && !vb_P[0]->harm, "CHORDS T1 (%u)", vb_hsrc);
+        turn(EN_ALGO, 1);
+        turn(EN_ALGO, 1);
+        turn(EN_ALGO, 1);
+        CHECK(ui.track == 3 && PLC() == &r1->play, "T4's PLAY page edits T1's chords");
+        press_b(B_PLAY);
+        for (b = 0; b < 14000u; b++) {                      /* 10 s: T4 on T1's steps, past its own 2 */
+            vb_audio_block(out, CTL);
+            if (vb_P[3]->playing)
+                CHECK(vb_P[3]->step == vb_P[0]->step, "in step (%u %u)", vb_P[3]->step, vb_P[0]->step);
+            if (vb_P[3]->step != vb_P[0]->step)
+                break;
+        }
+        CHECK(vb_P[3]->step >= 2, "T4 got past its own 2 steps (step %u)", vb_P[3]->step);
+        press_b(B_PLAY);
+        press_b(B_GLO);
+        ui.row[PG_GLO] = 0;
+        turn(EN_K3, -1);
+        CHECK(vb_hsrc == 0 && !vb_P[3]->harm && PLC() == &r4->play, "CHORDS OWN");
+        pass(3000);
+    }
+
     printf(failures ? "\n%d FAILED\n" : "\nall ui tests passed\n", failures);
     return failures != 0;
 }
