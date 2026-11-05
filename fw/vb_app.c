@@ -84,6 +84,13 @@ static volatile uint8_t vb_sel, vb_sel_to;                 /* the player holding
 static uint8_t vb_tmute[VB_TRACKS];                        /* GLO: 1 = the track is muted */
 static uint8_t vb_bound[VB_TRACKS];                        /* the sound each player was given last (0xFF: none) */
 #define vb_pl (*vb_P[ui.track])                            /* the selected track's player */
+#define VB_BG_POLY 5                                       /* voices for a track in the background (a 4-note chord + BASS) */
+static void vb_give(uint32_t from, uint32_t to)
+{
+    vb_player_give(vb_P[from], vb_P[to]);
+    vb_P[from]->poly = VB_BG_POLY;
+    vb_P[to]->poly = 0;
+}
 static volatile uint32_t vb_master_q12 = 2048;
 
 static vb_recipe_t *RC;                                    /* the sound on the selected track */
@@ -95,7 +102,7 @@ static void vb_audio_block(int32_t *out, uint32_t n)        /* audio ISR */
 {
     uint32_t i, t;
     if (vb_sel_to != vb_sel) {                             /* a new track selected: the buffers move to its player */
-        vb_player_give(vb_P[vb_sel], vb_P[vb_sel_to]);
+        vb_give(vb_sel, vb_sel_to);
         vb_sel = vb_sel_to;
     }
     if (vb_mute) {
@@ -126,7 +133,7 @@ static void sel_player(uint32_t t)
     for (i = 0; i < 40u && vb_sel != t; i++)
         fm1_delay_ms(1);
     if (vb_sel != t) {
-        vb_player_give(vb_P[vb_sel], vb_P[t]);
+        vb_give(vb_sel, t);
         vb_sel = (uint8_t)t;
     }
 }
@@ -393,6 +400,8 @@ static void sound_default(uint32_t s, vb_recipe_t *r)
             r->play.seq[i].note = (uint8_t)(48 + (i % 4 == 0 ? 0 : i % 8 == 4 ? 1 : 3));
         }
         r->play.rate = 2;
+    } else if (s == 3u) {                                          /* (track 4: the keys, not a second progression) */
+        r->play.mode = VB_PLAY_NOTE;
     }
 }
 /* bank sound s in RAM: its slot, loaded from flash (or new) into the slot no track uses for longest; a changed sound
@@ -612,6 +621,7 @@ static void vb_init(void)
         vb_P[i]->idle = fm1_wdt_feed;
         vb_tmute[i] = 0;
         vb_bound[i] = 0xFFu;
+        vb_P[i]->poly = i ? VB_BG_POLY : 0;
     }
     vb_sel = vb_sel_to = 0;
     ui.track = 0;

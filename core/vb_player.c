@@ -100,7 +100,7 @@ static void env_gate(vb_player_t *p, int on)
 
 static void voice_on(vb_player_t *p, int note, int vel)
 {
-    uint32_t v, best = 0, i;
+    uint32_t v, best = 0, i, np = p->poly && p->poly < VB_POLY ? p->poly : VB_POLY;
     note = clampi(note, 0, 127);
     vel = clampi(vel, 1, 127);
     p->last_note = (uint8_t)note;
@@ -111,21 +111,21 @@ static void voice_on(vb_player_t *p, int note, int vel)
         vb_drum_trigger(&p->drum, &p->effd, note % VB_DRUM_VOICES, vel);
         return;
     }
-    for (v = 0; v < VB_POLY; v++)            /* the same note again: retrigger its voice */
+    for (v = 0; v < np; v++)                 /* the same note again: retrigger its voice */
         if (p->vlive[v] && p->vnote[v] == note)
             break;
-    if (v == VB_POLY)
-        for (v = 0; v < VB_POLY && p->vlive[v]; v++)
+    if (v == np)
+        for (v = 0; v < np && p->vlive[v]; v++)
             ;
-    if (v == VB_POLY) {                      /* steal: the oldest released voice, else the oldest */
+    if (v == np) {                           /* steal: the oldest released voice, else the oldest */
         uint32_t age = 0xFFFFFFFFu;
-        for (i = 0; i < VB_POLY; i++)
+        for (i = 0; i < np; i++)
             if (!p->vgate[i] && p->vage[i] < age) {
                 age = p->vage[i];
                 best = i;
             }
         if (age == 0xFFFFFFFFu)
-            for (i = 0; i < VB_POLY; i++)
+            for (i = 0; i < np; i++)
                 if (p->vage[i] < age) {
                     age = p->vage[i];
                     best = i;
