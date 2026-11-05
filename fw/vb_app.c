@@ -85,6 +85,11 @@ static vb_bufs_t vb_bufs;                                  /* the buffers while 
 static volatile uint8_t vb_lead;                           /* the last track that held them (always 0..3): the tempo */
 static uint8_t vb_tmute[VB_TRACKS];                        /* GLO: 1 = the track is muted */
 static uint8_t vb_bound[VB_TRACKS];
+static uint8_t vb_sync;                                    /* GLO SYNC: 0 INT, 1 OUT (sends MIDI clock), 2 IN (follows one) */
+static volatile uint8_t vb_clk_cmd;                        /* main loop -> audio: 1 send START, 2 send STOP */
+static uint32_t vb_clk_acc;                                /* Q8 samples toward the next clock tick out */
+static volatile uint32_t vb_last16, vb_ms16;               /* the lead's last sixteenth and when it began (ms) */
+static volatile int32_t vb_nudge;                          /* clock in: samples (Q8) to move every track by */
 static uint8_t vb_hsrc;                                    /* GLO CHORDS: 0 each track its own, 1..4 every track plays T1..T4's */                        /* the sound each player was given last (0xFF: none) */
 #define vb_pl (*vb_P[ui.track])                            /* the selected track's player */
 #define VB_BG_POLY 5                                       /* voices for a track in the background (a 4-note chord + BASS) */
@@ -139,6 +144,31 @@ static void vb_audio_block(int32_t *out, uint32_t n)        /* audio ISR */
             for (i = 0; i < n; i++)
                 vb_mix[i] += vb_mono[i];
     }
+    if (vb_nudge) {                                        /* clock in: the phase pulled toward the clock's */
+        int32_t d = vb_nudge;
+        vb_nudge = 0;
+        for (t = 0; t < VB_TRACKS; t++) {
+            vb_player_t *q = vb_P[t];
+            q->tick_acc = d < 0 && (uint32_t)-d > q->tick_acc ? 0u : (uint32_t)((int32_t)q->tick_acc + d);
+        }
+    }
+    if (vb_P[vb_lead]->n16 != vb_last16) {
+        vb_last16 = vb_P[vb_lead]->n16;
+        vb_ms16 = fm1_ms;
+    }
+    if (vb_sync == 1u) {                                   /* clock out: 24 a quarter, START with PLAY */
+        uint32_t per = (uint32_t)(44100ull * 600u * 256u / (24u * (uint32_t)(vb_P[vb_lead]->bpm10 > 100 ? vb_P[vb_lead]->bpm10 : 1200)));
+        if (vb_clk_cmd) {
+            midi_out_event(0x0Fu | (vb_clk_cmd == 1u ? 0xFAu : 0xFCu) << 8);
+            vb_clk_acc = 0;
+            vb_clk_cmd = 0;
+        }
+        vb_clk_acc += n << 8;
+        while (vb_clk_acc >= per) {
+            vb_clk_acc -= per;
+            midi_out_event(0x0Fu | 0xF8u << 8);
+        }
+    }
     for (i = 0; i < n; i++) {
         int32_t s = vb_mix[i] > 32767 ? 32767 : vb_mix[i] < -32768 ? -32768 : vb_mix[i];
         out[2u * i] = s;
@@ -172,6 +202,8 @@ static void transport(int on)                              /* PLAY / STOP: every
     uint32_t t;
     for (t = 0; t < VB_TRACKS; t++)
         vb_player_play(vb_P[t], on);
+    if (vb_sync == 1u)
+        vb_clk_cmd = on ? 1u : 2u;
 }
 static void vb_master(int32_t *out, uint32_t n)            /* the MASTER knob, for the speaker and headphones */
 {
@@ -288,6 +320,7 @@ static void save_settings(void)
     vb_sec[15] = (uint8_t)(vb_pl.bpm10 >> 8);
     vb_sec[16] = (uint8_t)(vb_tmute[0] | vb_tmute[1] << 1 | vb_tmute[2] << 2 | vb_tmute[3] << 3 | 0xF0u);
     vb_sec[17] = vb_hsrc;
+    vb_sec[18] = vb_sync;
     {
         uint16_t c = vb_crc16(vb_sec + 8, 24);
         vb_sec[4] = (uint8_t)c;
@@ -612,6 +645,7 @@ static void boot_load(void)
         for (i = 0; i < VB_TRACKS; i++)                    /* (0xFF: settings from before the mutes) */
             vb_tmute[i] = vb_sec[16] == 0xFFu ? 0 : (uint8_t)((vb_sec[16] >> i) & 1u);
         vb_hsrc = vb_sec[17] <= VB_TRACKS ? vb_sec[17] : 0;
+        vb_sync = vb_sec[18] <= 2u ? vb_sec[18] : 0;
     }
 }
 
@@ -727,6 +761,7 @@ static const char *const CACT_N[3] = {"INS", "DUP", "DEL"};
 static const char *const CIN_N[2] = {"NOTES", "DEGREE"};
 static const char *const MUTE_N[2] = {"PLAY", "MUTE"};
 static const char *const HSRC_N[VB_TRACKS + 1] = {"OWN", "T1", "T2", "T3", "T4"};
+static const char *const SYNC_N[3] = {"INT", "OUT", "IN"};
 static const char *const SACT_N[4] = {"ON/OFF", "INS", "DUP", "DEL"};
 static const char *const SAMP_LBL[8] = {"START", "LEN", "LOOP", "REV", "PITCH", "FINE", "FADE", "GAIN"};
 static const char *const SAMP_LOOP_N[3] = {"OFF", "FWD", "P-P"};
@@ -898,6 +933,7 @@ static void build_rows(void)
         cl(0, 0, "BPM", K_BPM, F_NUM, 0, 40, 300, 0, VB_ADDR_NONE, 0);
         cl(0, 1, "CHAOS", K_CHAOS, F_PCT, &ui.chaos, 0, 100, 0, VB_ADDR_NONE, 0);
         cl(0, 2, "CHORDS", K_HSRC, F_LIST, &vb_hsrc, 0, VB_TRACKS, HSRC_N, VB_ADDR_NONE, 0);
+        cl(0, 3, "SYNC", K_MUTE, F_LIST, &vb_sync, 0, 2, SYNC_N, VB_ADDR_NONE, 0);
         {
             static const char *const TN[VB_TRACKS] = {"T1", "T2", "T3", "T4"};
             uint32_t k;
@@ -1805,6 +1841,59 @@ static void vb_input(void)
     vb_autosave();
 }
 
+/* ---- MIDI clock in (SYNC IN): START / STOP / CONTINUE run the tracks; the tempo from the ticks' times (ms) over
+ * a beat, and at every sixteenth the tracks' phase pulled a quarter of the way to the clock's */
+static struct { uint32_t ticks, beat_ms, run, ext, checked, ext_ms[8]; } clk;
+static void clock_in(uint32_t rt, uint32_t ms)
+{
+    if (rt == 0xFAu || rt == 0xFBu) {                     /* the first tick after START is the first sixteenth's */
+        clk.ticks = clk.ext = clk.checked = 0;
+        clk.run = 1;
+        if (!vb_pl.playing)
+            transport(1);
+        return;
+    }
+    if (rt == 0xFCu) {
+        clk.run = 0;
+        if (vb_pl.playing)
+            transport(0);
+        return;
+    }
+    if (rt != 0xF8u || !clk.run)
+        return;
+    clk.ticks++;
+    if (clk.ticks % 24u == 1u) {                           /* a beat begins: the tempo over the last one */
+        uint32_t dt = ms - clk.beat_ms;
+        if (clk.ticks > 1u && dt >= 20u && dt <= 1500u) {
+            int b = (int)((600000u + dt / 2u) / dt);
+            vb_pl.bpm10 = clampi(clk.ticks == 25u ? b : (vb_pl.bpm10 * 3 + b) / 4, 400, 3000);
+        }
+        clk.beat_ms = ms;
+    }
+    if (clk.ticks % 6u == 1u) {                            /* a sixteenth begins: when (the phase, below) */
+        uint32_t ext = (clk.ticks - 1u) / 6u + 1u;
+        clk.ext_ms[ext % 8u] = ms;
+        clk.ext = ext;
+    }
+}
+/* the same sixteenth, the clock's and ours, once both began: ours pulled half way to the clock's */
+static void clock_phase(void)
+{
+    uint32_t ours = vb_last16;
+    if (vb_sync != 2u || !clk.run || !vb_pl.playing || !ours || ours == clk.checked)
+        return;
+    if (ours + 8u <= clk.ext || ours > clk.ext + 8u) {     /* far apart (a stall): start over from the clock's */
+        clk.checked = ours;
+        return;
+    }
+    if (ours > clk.ext)                                    /* ours began, the clock's not yet: wait */
+        return;
+    clk.checked = ours;
+    vb_nudge = (int32_t)(vb_ms16 - clk.ext_ms[ours % 8u]) * 441 * 256 / 20;   /* + late: sooner, - early: later */
+    if (ours + 2u <= clk.ext)                              /* (and a whole sixteenth or more behind: catch up) */
+        vb_nudge += 5 * 441 * 256 / 10;
+}
+
 /* ---- USB MIDI notes in (a DAW or another controller plays the sound) */
 static void vb_midi_in(void)
 {
@@ -1815,12 +1904,19 @@ static void vb_midi_in(void)
     }
     while (mi_r != mi_w) {
         uint32_t pkt = midi_in_q[mi_r % MQ], st = (pkt >> 8) & 0xF0u, d1 = (pkt >> 16) & 0x7Fu, d2 = (pkt >> 24) & 0x7Fu;
+        uint32_t ms = midi_in_ms[mi_r % MQ], rt = (pkt >> 8) & 0xFFu;
         mi_r++;
+        if ((pkt & 15u) == 0xFu && rt >= 0xF8u) {
+            if (vb_sync == 2u)
+                clock_in(rt, ms);
+            continue;
+        }
         if (st == 0x90u && d2)
             vb_player_note(&vb_pl, (int)d1, (int)d2, 1);
         else if (st == 0x80u || st == 0x90u)
             vb_player_note(&vb_pl, (int)d1, 0, 0);
     }
+    clock_phase();
 }
 
 /* ---- remote control and diagnostics: SysEx F0 7D 56 42 <cmd> <a> <b> F7 (tools/fm1_remote.py)

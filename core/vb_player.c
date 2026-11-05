@@ -300,6 +300,7 @@ static void on_16th(vb_player_t *p)
 static void transport_start(vb_player_t *p)
 {
     p->playing = 1;
+    p->n16 = 0;
     p->chord_count = 0;
     p->step = 0;
     p->step_left = 0;
@@ -702,6 +703,7 @@ void vb_player_render(vb_player_t *p, int32_t *out, int n)
         while (p->tick_acc >= p->tick_q8) {
             p->tick_acc -= p->tick_q8;
             on_16th(p);
+            p->n16++;
         }
     }
     ev_run(p, p->now + (uint32_t)n);

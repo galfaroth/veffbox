@@ -350,6 +350,68 @@ int main(void)
         pass(3000);
     }
 
+    /* SYNC OUT: START, 24 ticks a quarter at the tempo; SYNC IN: a clock at 125 BPM is followed, tempo and phase */
+    {
+        int32_t out[2 * CTL];
+        uint32_t b, k, ticks = 0, starts = 0;
+        boot(1);
+        vb_sync = 1;
+        host_nmout = 0;
+        press_b(B_PLAY);
+        for (b = 0; b < 2756u; b++)                        /* 2 s at 120 BPM: 4 beats, 96 ticks */
+            vb_audio_block(out, CTL);
+        for (k = 0; k < host_nmout; k++) {
+            ticks += host_mout[k] == (0x0Fu | 0xF8u << 8);
+            starts += host_mout[k] == (0x0Fu | 0xFAu << 8);
+        }
+        CHECK(starts == 1 && ticks >= 95 && ticks <= 97, "clock out: START %u, %u ticks in 2 s", starts, ticks);
+        press_b(B_PLAY);
+        for (b = 0; b < 4u; b++)
+            vb_audio_block(out, CTL);
+        CHECK(host_mout[host_nmout - 1] == (0x0Fu | 0xFCu << 8) || host_mout[host_nmout - 2] == (0x0Fu | 0xFCu << 8),
+              "STOP sent");
+
+        vb_sync = 2;                                       /* in: 125 BPM, the ticks 20 ms apart */
+        {
+            uint32_t smp = 0, next_tick_us = 0, nt = 0, worst = 0;
+            int started = 0;
+            fm1_ms = 100000;
+            for (b = 0; b < 27563u; b++) {                 /* 20 s */
+                uint32_t us = (uint32_t)((uint64_t)smp * 1000000u / 44100u);
+                fm1_ms = 100000u + us / 1000u;
+                while (us >= next_tick_us) {
+                    uint32_t pkt = !started ? 0x0Fu | 0xFAu << 8 : 0x0Fu | 0xF8u << 8;
+                    midi_in_q[mi_w % MQ] = pkt;
+                    midi_in_ms[mi_w % MQ] = 100000u + next_tick_us / 1000u;
+                    mi_w++;
+                    if (started) {
+                        nt++;
+                        next_tick_us += 20000u;
+                    } else
+                        started = 1;
+                }
+                vb_midi_in();
+                {   /* the commands reach the players with the next block */
+                    vb_audio_block(out, CTL);
+                }
+                smp += CTL;
+                if (b > 22050u && nt % 6u == 1u && vb_last16 == (nt - 1u) / 6u + 1u) {
+                    uint32_t e = vb_ms16 > (100000u + (nt - 1u) * 20u) ? vb_ms16 - (100000u + (nt - 1u) * 20u)
+                                                                       : (100000u + (nt - 1u) * 20u) - vb_ms16;
+                    worst = e > worst ? e : worst;
+                }
+            }
+            CHECK(vb_pl.playing && vb_pl.bpm10 >= 1245 && vb_pl.bpm10 <= 1255, "clock in: playing at %d.%d BPM", vb_pl.bpm10 / 10,
+                  vb_pl.bpm10 % 10);
+            CHECK(vb_last16 + 1u >= (nt - 1u) / 6u + 1u && vb_last16 <= (nt - 1u) / 6u + 2u,
+                  "clock in: in phase after 20 s (ours %u, the clock's %u)", vb_last16, (nt - 1u) / 6u + 1u);
+            CHECK(worst <= 3u, "clock in: the sixteenths within %u ms of the clock's (16 s on)", worst);
+            printf("clock in: %d.%d BPM, worst phase %u ms\n", vb_pl.bpm10 / 10, vb_pl.bpm10 % 10, worst);
+        }
+        vb_sync = 0;
+        vb_player_play(&vb_pl, 0);
+    }
+
     printf(failures ? "\n%d FAILED\n" : "\nall ui tests passed\n", failures);
     return failures != 0;
 }

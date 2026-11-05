@@ -57,6 +57,7 @@ typedef struct {
     int32_t rec_pair;
     int32_t peak;                        /* output peak since the UI last read it */
     const vb_play_t *harm;               /* CHORD plays these chords (another track's: CHORDS on GLO), 0: its own */
+    uint32_t n16;                        /* sixteenths since PLAY (MIDI clock: the phase) */
     uint8_t poly;                        /* the voices a note may take (0: all VB_POLY): fewer for a track in the background */
     uint32_t hush;                       /* blocks of silence, stopped and with nothing pending: it sleeps after 2000 */
     int32_t block[32];

@@ -56,6 +56,9 @@ static int32_t host_enc[7];
 static int32_t enc_take(uint32_t e) { int32_t s = host_enc[e % 7u]; host_enc[e % 7u] = 0; return s; }
 #define MQ 64u
 static uint32_t midi_in_q[MQ], mi_r, mi_w, midi_in_overflow;
+static uint32_t midi_in_ms[MQ];
+static uint32_t host_mout[4096], host_nmout;                /* what the firmware sent out over MIDI */
+static void midi_out_event(uint32_t pkt) { if (host_nmout < 4096u) host_mout[host_nmout++] = pkt; }
 static int ota_frame_get(const uint8_t **p, uint32_t *n) { (void)p; (void)n; return 0; }
 static void ota_frame_done(void) {}
 static void ota_wire_send(const uint8_t *p, uint32_t n) { (void)p; (void)n; }
