@@ -136,6 +136,7 @@ static void ed_service(void) { vb_remote(); }
 #include "vb/vb_gran.h"
 #include "vb/vb_chop.h"
 #include "vb/vb_store.h"
+#include "vb/vb_lib.h"
 #include "vb_app.c"
 
 /* ---- interrupts */

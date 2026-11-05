@@ -105,4 +105,5 @@ static void vb_remote(void);
 #include "../core/vb_gran.h"
 #include "../core/vb_chop.h"
 #include "../core/vb_store.h"
+#include "../core/vb_lib.h"
 #include "../fw/vb_app.c"

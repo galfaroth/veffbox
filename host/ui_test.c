@@ -350,6 +350,32 @@ int main(void)
         pass(3000);
     }
 
+    /* LIB on SRC and FX: turning applies the next library entry; hold SEL brings back what was there before browsing */
+    {
+        vb_recipe_t before;
+        boot(1);
+        press_b(B_EDIT);
+        before = *RC;
+        build_rows();
+        ui.row[PG_SRC] = (uint8_t)(NR - 1u);
+        turn(EN_K1, 1);
+        CHECK(ui.lib_src == 1 && RC->src == VB_SRC_OP4 && RC->op4[37] == 50, "LIB 1: LATEX (src %u fb %u)", RC->src, RC->op4[37]);
+        turn(EN_K1, 1);
+        turn(EN_K1, 1);
+        turn(EN_K1, 1);
+        turn(EN_K1, 1);
+        turn(EN_K1, 1);
+        turn(EN_K1, 1);
+        CHECK(ui.lib_src == 7 && RC->src == VB_SRC_ANLG, "LIB 7: SUPERSAW (src %u)", RC->src);
+        undo();
+        CHECK(!memcmp(RC, &before, sizeof before), "hold SEL: the sound from before browsing");
+        press_b(B_FX);
+        ui.row[PG_FX] = 2;
+        turn(EN_K1, 1);
+        CHECK(RC->fx[0].type == VB_FX_DRIVE && RC->fx[3].type == VB_FX_REVERB && RC->fx[4].type == 0, "LIB FX: HYPER");
+        pass(3000);
+    }
+
     /* SYNC OUT: START, 24 ticks a quarter at the tempo; SYNC IN: a clock at 125 BPM is followed, tempo and phase */
     {
         int32_t out[2 * CTL];

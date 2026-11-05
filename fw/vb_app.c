@@ -13,6 +13,7 @@
 
 static void vb_midi_in(void);
 static void load_gens(uint32_t sound);
+static void undo_mark(void);
 static void vb_draw_now(void);
 /* ---- panel: which matrix button / encoder carries which label (MNM-1's panel.c defaults) */
 enum { B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO, B_HOME, B_SAVE, B_ARP, B_SEQ, B_PLAY, B_REC, B_OCTDN, B_OCTUP, NB };
@@ -225,7 +226,7 @@ static const char *const PG_NAME[NPG] = {"SRC", "PLAY", "MOD", "FX", "RESAMPLE",
 static struct {
     uint8_t page, row[NPG], track, op, opsel, dvoice, cact, sact, song, song_do, oct, chaos, bank_do;
     int8_t learn_src, learn_slot;
-    uint8_t force, d_hdr, d_vis, d_prm, printing, undo_ok;
+    uint8_t force, d_hdr, d_vis, d_prm, printing, undo_ok, lib_src, lib_fx;
     uint32_t vis_due, msg_until, sel_t0, rolls, rng;
     char msg[28];
 } ui;
@@ -707,7 +708,7 @@ static void vb_init(void)
 /* ---- cells: what a knob edits */
 enum { F_NUM, F_LIST, F_S24, F_S64, F_PCT, F_NOTE, F_LEN, F_HALF, F_DEST, F_AMT, F_HZ };
 enum { K_U8, K_ROOT, K_CTYPE, K_CNOTE, K_FXTYPE, K_MOVE, K_DEST, K_AMT, K_BPM, K_CHAOS, K_SOUND, K_GEN, K_DO, K_STEPS, K_VOI,
-       K_BASS, K_SONG, K_MUTE, K_HSRC };
+       K_BASS, K_SONG, K_MUTE, K_HSRC, K_LIBSRC, K_LIBFX };
 typedef struct {
     const char *label;
     uint8_t kind, fmt;
@@ -828,6 +829,8 @@ static void build_rows(void)
                    i == 2 ? SAMP_LOOP_N : i == 3 ? ONOFF_N : 0, (i == 2 || i == 3) ? VB_ADDR_NONE : VB_ADDR(VB_D_SAMP, i), 0);
             NR = 2;
         }
+        cl(NR, 0, "LIB", K_LIBSRC, F_LIST, &ui.lib_src, 0, vb_lib_nsrc(), vb_lib_src_names, VB_ADDR_NONE, 0);
+        NR++;
         break;
     case PG_PLAY:
         cl(0, 0, "MODE", K_U8, F_LIST, &pl->mode, 0, 2, MODE_N, VB_ADDR_NONE, 0);
@@ -909,7 +912,8 @@ static void build_rows(void)
         cl(1, 1, "MIX", K_U8, F_PCT, &f->mix, 0, 127, 0, VB_ADDR(VB_D_FX, s * 5 + 4), 0);
         cl(1, 2, "ON", K_U8, F_LIST, &f->on, 0, 1, ONOFF_N, VB_ADDR_NONE, 0);
         cl(1, 3, "MOVE", K_MOVE, F_NUM, 0, 1, 8, 0, VB_ADDR_NONE, 0);
-        NR = 2;
+        cl(2, 0, "LIB", K_LIBFX, F_LIST, &ui.lib_fx, 0, vb_lib_nfx(), vb_lib_fx_names, VB_ADDR_NONE, 0);
+        NR = 3;
         break;
     }
     case PG_PRINT:
@@ -1077,6 +1081,18 @@ static void cell_set(const cell_t *x, int v)
     case K_BASS: ch->bass = (uint8_t)v; break;
     case K_VOI: vb_chord_voice(ch, v); break;
     case K_SONG: ui.song = (uint8_t)v; ui.d_vis = ui.d_prm = 1; return;
+    case K_LIBSRC:                                         /* the library: applied as you turn; hold SEL: back */
+    case K_LIBFX:
+        undo_mark();
+        *x->p = (uint8_t)v;
+        if (v && x->kind == K_LIBSRC)
+            vb_lib_src(RC, v - 1);
+        else if (v)
+            vb_lib_fx(RC, v - 1);
+        say(x->kind == K_LIBSRC ? vb_lib_src_names[v] : vb_lib_fx_names[v]);
+        touch();
+        dirty();
+        return;
     case K_HSRC: vb_hsrc = (uint8_t)v; harm_bind(); vb_st.dirty = 1; vb_st.due = fm1_ms + 2500u; dirty(); return;
     case K_MUTE: *x->p = (uint8_t)v; vb_st.dirty = 1; vb_st.due = fm1_ms + 2500u; ui.d_vis = ui.d_prm = 1; return;
     case K_FXTYPE: {
@@ -1823,7 +1839,8 @@ static void vb_input(void)
             dirty();
             continue;
         }
-        ui.undo_ok = 0;                                    /* a hand edit ends the series of rolls */
+        if (x->kind != K_LIBSRC && x->kind != K_LIBFX)
+            ui.undo_ok = 0;                                /* a hand edit ends the series of rolls (not LIB browsing) */
         step = (x->fmt == F_LIST || x->kind == K_DEST || x->kind == K_CNOTE || x->kind == K_GEN || x->kind == K_BASS)
                ? (d > 0 ? 1 : -1)
                : d * (d > 1 || d < -1 ? 4 : 1);
