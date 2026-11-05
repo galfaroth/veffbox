@@ -8,7 +8,7 @@ and screenshots of the new screens (`make shots`).
 The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in the order agreed on 2026-11-05:
 
 1. ~~Chords by degree (I, III ...), entered HiChord / Orchid style, jamming with them~~: done in 0.4.0.
-2. **Several tracks at once** (item 2 of the old order below).
+2. ~~Several tracks at once~~: done in 0.5.0.
 3. **Chords per track or global**: one progression for all tracks, or each track its own.
 4. **Play in sync**: MIDI clock in and out.
 5. **A built-in library** of sources and effects to browse and add (a few character sounds: rubbery basses, latex
@@ -23,8 +23,7 @@ The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in t
 
 The order agreed before:
 
-2. **Four tracks sounding at once.** The background tracks get only FX that need no buffer, because RAM is nearly full:
-   95.7 of 96 KiB, and the pool has 14 KiB free.
+2. ~~Four tracks sounding at once~~ (0.5.0).
 3. **Sidechain on the device**, as in the mockup:
    - an envelope follower per track;
    - DUCK and GATE (AMT, ATK, REL, SRC track);
@@ -52,6 +51,12 @@ The order agreed before:
 
 ## Done
 
+- 0.5.0: four tracks at once. A player per track, mixed, PLAY / STOP for all; the selected track holds the FX
+  buffers and the print (moved in the audio thread in two steps, cleared in the main loop between); in the background a
+  track bypasses the buffered FX, a sampler source is silent, 5 voices; MUTE per track on GLO; players sleep after 1.5 s
+  of silence. The bank in RAM is an 8-sound cache (saved before reuse), which freed ~47 KB of the pool. On the FM-1:
+  idle 2.5%; T1 chords + T2 bass + T3 drums 56% avg, 68% max; two chord tracks + drums 78% max; 18 track changes while
+  playing: no late buffer.
 - 0.4.0: chords by degree. KEY, SCALE (9 scales) and CHORD INPUT DEGREE: the keys are a chord pad on every page
   (C4..B4 I..VII, C5..G5 an octave up, the black keys bII bIII bV bVI bVII; F3..B3 held: 7 6 SWAP SUS2 SUS4 DIM 9); on PLAY,
   stopped, each chord fills the selected step; the roman numeral on the screen.

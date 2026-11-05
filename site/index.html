@@ -843,7 +843,7 @@ document.getElementById('firstSound').addEventListener('click', () => { document
       <span class="num">08 · Bank and tracks</span>
       <h2 id="bank-title">64 sounds.<br>Four tracks. One in focus.</h2>
       <p class="lead">The bank holds 64 sounds, each with its own generation tree. Four tracks each play one bank sound.
-        You edit one at a time, full screen, while the others keep playing as context.</p>
+        All four play at once, from one PLAY; you edit one at a time, full screen, while the others keep playing.</p>
     </div>
     <div class="bank-wrap">
       <div class="bank" id="bankgrid" role="img" aria-label="64 bank slots; slots 1, 2, 5 and 6 sit on tracks 1 to 4, track 2 is being edited."></div>
@@ -858,7 +858,9 @@ document.getElementById('firstSound').addEventListener('click', () => { document
           <div class="trk"><b>T3 · 05</b>SUB BASS</div>
           <div class="trk"><b>T4 · 06</b>BOOM KIT</div>
         </div>
-        <p class="meta">GLO holds what the tracks share: BPM and CHAOS.</p>
+        <p class="meta">GLO holds what the tracks share: BPM, CHAOS, and a MUTE for each track. The track in focus has the
+          resample and the effects that keep audio (delay, reverb, chorus, freeze, shift, strings); the others play their
+          synth, sequence, modulation and the rest of their chain, with up to five voices each.</p>
       </div>
     </div>
   </div>
@@ -930,7 +932,8 @@ document.getElementById('firstSound').addEventListener('click', () => { document
         <li><span class="m">M4</span><span class="t">RESAMPLE <span class="tag ok">done</span></span><span class="d">The chain renders into RAM (1.67 s); SAMP, GRAN and CHOP play it.</span></li>
         <li><span class="m">M5</span><span class="t">Bank <span class="tag ok">done</span></span><span class="d">64 sounds and their generations in flash, LOAD, EDIT, REBUILD.</span></li>
         <li><span class="m">M6</span><span class="t">In the browser <span class="tag ok">done</span></span><span class="d">The firmware as WebAssembly: the emulator and the step-by-step guide at the top of this page.</span></li>
-        <li><span class="m">M7</span><span class="t">Next</span><span class="d">Four tracks sounding at once, PITCH as a modulation target, longer resamples, sidechain and spectral effects.</span></li>
+        <li><span class="m">M7</span><span class="t">Four tracks <span class="tag ok">done</span></span><span class="d">All four tracks sound at once; chords by degree from the keys.</span></li>
+        <li><span class="m">M8</span><span class="t">Next</span><span class="d">One chord progression for every track, MIDI clock, a sound library, a chord-following arp, melodies that land on the chord.</span></li>
       </ol>
     </div>
   </div>
