@@ -92,6 +92,7 @@ static uint32_t vb_clk_acc;                                /* Q8 samples toward 
 static volatile uint32_t vb_last16, vb_ms16;               /* the lead's last sixteenth and when it began (ms) */
 static volatile int32_t vb_nudge;                          /* clock in: samples (Q8) to move every track by */
 static uint8_t vb_hsrc;
+static uint8_t vb_knext[VB_TRACKS];                       /* PLAY KEYS: 0 PLAY (the notes), 1 NEXT (any key, the next step) */
 static uint8_t vb_nout;                                    /* GLO MIDI OUT: every track's notes out on channel 1..4 */
 static void note_out(uint8_t ch, uint8_t note, uint8_t vel, uint8_t on)   /* (the audio thread) */
 {
@@ -102,6 +103,7 @@ static void nout_bind(void)
 {
     uint32_t k;
     for (k = 0; k < VB_TRACKS; k++) {
+        vb_P[k]->manual = vb_knext[k];
         vb_P[k]->out_ch = (uint8_t)k;
         vb_P[k]->note_out = vb_nout ? note_out : 0;
     }
@@ -337,6 +339,8 @@ static void save_settings(void)
     vb_sec[17] = vb_hsrc;
     vb_sec[18] = vb_sync;
     vb_sec[19] = vb_nout;
+    for (i = 0; i < VB_TRACKS; i++)
+        vb_sec[20 + i] = vb_knext[i];
     {
         uint16_t c = vb_crc16(vb_sec + 8, 24);
         vb_sec[4] = (uint8_t)c;
@@ -663,6 +667,8 @@ static void boot_load(void)
         vb_hsrc = vb_sec[17] <= VB_TRACKS ? vb_sec[17] : 0;
         vb_sync = vb_sec[18] <= 2u ? vb_sec[18] : 0;
         vb_nout = vb_sec[19] <= 1u ? vb_sec[19] : 0;
+        for (i = 0; i < VB_TRACKS; i++)
+            vb_knext[i] = vb_sec[20 + i] == 1u;
     }
 }
 
@@ -707,6 +713,7 @@ static void vb_init(void)
     for (i = 0; i < VB_TRACKS; i++) {
         vb_P[i]->idle = fm1_wdt_feed;
         vb_tmute[i] = 0;
+        vb_knext[i] = 0;
         vb_bound[i] = 0xFFu;
         vb_P[i]->harm = 0;
         vb_P[i]->poly = i ? VB_BG_POLY : 0;
@@ -725,7 +732,7 @@ static void vb_init(void)
 /* ---- cells: what a knob edits */
 enum { F_NUM, F_LIST, F_S24, F_S64, F_PCT, F_NOTE, F_LEN, F_HALF, F_DEST, F_AMT, F_HZ };
 enum { K_U8, K_ROOT, K_CTYPE, K_CNOTE, K_FXTYPE, K_MOVE, K_DEST, K_AMT, K_BPM, K_CHAOS, K_SOUND, K_GEN, K_DO, K_STEPS, K_VOI,
-       K_BASS, K_SONG, K_MUTE, K_HSRC, K_LIBSRC, K_LIBFX, K_NOUT };
+       K_BASS, K_SONG, K_MUTE, K_HSRC, K_LIBSRC, K_LIBFX, K_NOUT, K_KNEXT };
 typedef struct {
     const char *label;
     uint8_t kind, fmt;
@@ -785,6 +792,7 @@ static const char *const HSRC_N[VB_TRACKS + 1] = {"OWN", "T1", "T2", "T3", "T4"}
 static const char *const SYNC_N[3] = {"INT", "OUT", "IN"};
 static const char *const SACT_N[6] = {"ON/OFF", "INS", "DUP", "DEL", "RND 3", "RND 4"};
 static const char *const SNAP_N[3] = {"OFF", "CHORD", "SCALE"};
+static const char *const KEYS_N[2] = {"PLAY", "NEXT"};
 static const char *const RANGE_N[3] = {"1 OCT", "2 OCT", "3 OCT"};
 static const char *const SAMP_LBL[8] = {"START", "LEN", "LOOP", "REV", "PITCH", "FINE", "FADE", "GAIN"};
 static const char *const SAMP_LOOP_N[3] = {"OFF", "FWD", "P-P"};
@@ -885,6 +893,7 @@ static void build_rows(void)
             cl(6, 0, "INPUT", K_U8, F_LIST, &RC->cin, 0, 1, CIN_N, VB_ADDR_NONE, 0);
             cl(6, 1, "KEY", K_U8, F_LIST, &RC->key, 0, 11, NOTE_NM, VB_ADDR_NONE, 0);
             cl(6, 2, "SCALE", K_U8, F_LIST, &RC->scale, 0, VB_SCALES - 1, vb_scale_name, VB_ADDR_NONE, 0);
+            cl(6, 3, "KEYS", K_KNEXT, F_LIST, &vb_knext[ui.track], 0, 1, KEYS_N, VB_ADDR_NONE, 0);
             NR = 7;
         } else if (pl->mode == VB_PLAY_SEQ) {
             vb_step_t *st = &pl->seq[pl->sel % VB_SEQ_STEPS];
@@ -900,7 +909,8 @@ static void build_rows(void)
             cl(3, 1, "RANGE", K_U8, F_LIST, &RC->mel_oct, 0, 2, RANGE_N, VB_ADDR_NONE, 0);
             cl(3, 2, "KEY", K_U8, F_LIST, &RC->key, 0, 11, NOTE_NM, VB_ADDR_NONE, 0);
             cl(3, 3, "SCALE", K_U8, F_LIST, &RC->scale, 0, VB_SCALES - 1, vb_scale_name, VB_ADDR_NONE, 0);
-            NR = 4;
+            cl(4, 0, "KEYS", K_KNEXT, F_LIST, &vb_knext[ui.track], 0, 1, KEYS_N, VB_ADDR_NONE, 0);
+            NR = 5;
         } else {
             cl(1, 0, "VEL", K_U8, F_NUM, &pl->vel, 1, 127, 0, VB_ADDR(VB_D_PLAY, 2), 0);
             cl(1, 1, "SNAP", K_U8, F_LIST, &RC->snap, 0, 2, SNAP_N, VB_ADDR_NONE, 0);
@@ -1126,6 +1136,14 @@ static void cell_set(const cell_t *x, int v)
             vb_lib_fx(RC, v - 1);
         say(x->kind == K_LIBSRC ? vb_lib_src_names[v] : vb_lib_fx_names[v]);
         touch();
+        dirty();
+        return;
+    case K_KNEXT:
+        *x->p = (uint8_t)v;
+        vb_P[ui.track]->manual = (uint8_t)v;
+        say(v ? "ANY KEY: THE NEXT STEP" : "KEYS PLAY NOTES");
+        vb_st.dirty = 1;
+        vb_st.due = fm1_ms + 2500u;
         dirty();
         return;
     case K_NOUT: vb_nout = (uint8_t)v; nout_bind(); vb_st.dirty = 1; vb_st.due = fm1_ms + 2500u; dirty(); return;
@@ -1774,10 +1792,57 @@ static int snap_key(int note)
 }
 static uint8_t key_note[27];                               /* the note each key sounds (SNAP may move it) */
 
+/* KEYS NEXT: any key plays the next step (a note, or a chord: its notes, or the arp of them), as long as it is held */
+static uint8_t key_step[27];                               /* the step each key plays, + 1 (0: none) */
+static void next_key(uint32_t n, int down)
+{
+    vb_play_t *pl = RC->play.mode == VB_PLAY_SEQ ? &RC->play : PLC();
+    int seq = RC->play.mode == VB_PLAY_SEQ, len = pl->len ? pl->len : 1, s, i;
+    if (n >= 27u)
+        return;
+    if (!down) {                                           /* the notes it started, off */
+        if (key_step[n]) {
+            s = key_step[n] - 1;
+            if (seq)
+                vb_player_note(&vb_pl, key_note[n], 0, 0);
+            else {
+                const vb_chord_t *c = &pl->chord[s % VB_CHORD_STEPS];
+                for (i = 0; i < c->n; i++)
+                    vb_player_note(&vb_pl, c->note[i], 0, 0);
+                if (vb_chord_bass(c))
+                    vb_player_note(&vb_pl, vb_chord_bass(c), 0, 0);
+            }
+            key_step[n] = 0;
+        }
+        return;
+    }
+    s = pl->sel % len;
+    if (seq) {                                             /* the next step that is on */
+        for (i = 0; i < len && !pl->seq[(s + i) % len].on; i++)
+            ;
+        s = (s + i) % len;
+        key_note[n] = (uint8_t)(RC->snap ? snap_key(pl->seq[s].note) : pl->seq[s].note);
+        vb_player_note(&vb_pl, key_note[n], RC->play.vel, 1);
+    } else {
+        const vb_chord_t *c = &pl->chord[s % VB_CHORD_STEPS];
+        for (i = 0; i < c->n; i++)
+            vb_player_note(&vb_pl, c->note[i], RC->play.vel, 1);
+        if (vb_chord_bass(c))
+            vb_player_note(&vb_pl, vb_chord_bass(c), RC->play.vel, 1);
+    }
+    key_step[n] = (uint8_t)(s + 1);
+    pl->sel = (uint8_t)((s + 1) % len);                    /* the screen shows the one up next */
+    ui.d_vis = 1;
+}
+
 static void key(uint32_t n, int down)
 {
     int note = 53 + (int)n + 12 * ((int)ui.oct - 2);       /* key 0 = F3 at OCT 0 */
     vb_play_t *pl = &RC->play;
+    if (vb_knext[ui.track] && pl->mode != VB_PLAY_NOTE) {
+        next_key(n, down);
+        return;
+    }
     if (pl->mode >= VB_PLAY_CHORD && RC->cin) {
         chord_pad(n, down);
         return;

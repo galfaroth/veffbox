@@ -59,6 +59,7 @@ typedef struct {
     const vb_play_t *harm;               /* CHORD plays these chords (another track's: CHORDS on GLO), 0: its own */
     uint32_t n16;                        /* sixteenths since PLAY (MIDI clock: the phase) */
     uint8_t poly;
+    uint8_t manual;                      /* KEYS NEXT: the keys play its steps; the sequencer only keeps time */
     uint8_t held[8], nheld, arp_sub;     /* ARP: the keys held (they feed the arp), the rate's countdown */
     uint32_t arp_i;
     void (*note_out)(uint8_t ch, uint8_t note, uint8_t vel, uint8_t on);   /* every note played, out (MIDI); 0: none */

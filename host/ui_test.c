@@ -468,6 +468,60 @@ int main(void)
         pass(3000);
     }
 
+    /* KEYS NEXT: any key plays the next step, the sequencer leaves the track to the keys */
+    {
+        int32_t out[2 * CTL];
+        uint32_t b, k, t1 = 0;
+        boot(1);
+        RC->play.mode = VB_PLAY_SEQ;
+        RC->play.len = 3;
+        for (k = 0; k < 3u; k++) {
+            RC->play.seq[k].on = 1;
+            RC->play.seq[k].note = (uint8_t)(60 + 2 * k);
+        }
+        RC->play.sel = 0;
+        press_b(B_ARP);
+        ui.row[PG_PLAY] = 4;
+        turn(EN_K1, 1);
+        CHECK(vb_knext[0] && vb_P[0]->manual, "KEYS NEXT");
+        keyset(20, 1);
+        CHECK(key_note[20] == 60, "a key: step 1 (%u)", key_note[20]);
+        keyset(20, 0);
+        keyset(2, 1);
+        CHECK(key_note[2] == 62, "another key: step 2 (%u)", key_note[2]);
+        keyset(2, 0);
+        keyset(26, 1);
+        keyset(26, 0);
+        keyset(0, 1);
+        CHECK(key_note[0] == 60 && RC->play.sel == 1, "after step 3, step 1 again (%u, next %u)", key_note[0], RC->play.sel);
+        keyset(0, 0);
+        vb_nout = 1;
+        nout_bind();
+        host_nmout = 0;
+        press_b(B_PLAY);
+        for (b = 0; b < 2756u; b++)
+            vb_audio_block(out, CTL);
+        press_b(B_PLAY);
+        for (k = 0; k < host_nmout; k++)
+            t1 += (host_mout[k] & 0xFFFFu) == (0x09u | 0x90u << 8);
+        CHECK(!t1, "PLAY: the sequencer leaves T1 to the keys (%u notes)", t1);
+        RC->play.mode = VB_PLAY_CHORD;                     /* a chord step */
+        RC->play.sel = 0;
+        host_nmout = 0;
+        keyset(5, 1);
+        for (b = 0; b < 4u; b++)
+            vb_audio_block(out, CTL);
+        for (k = 0, t1 = 0; k < host_nmout; k++)
+            t1 += (host_mout[k] & 0xFFFFu) == (0x09u | 0x90u << 8);
+        CHECK(t1 == RC->play.chord[0].n + (vb_chord_bass(&RC->play.chord[0]) ? 1u : 0u), "a key: chord 1's %u notes (%u)",
+              RC->play.chord[0].n, t1);
+        keyset(5, 0);
+        vb_knext[0] = 0;
+        vb_nout = 0;
+        nout_bind();
+        pass(3000);
+    }
+
     /* SYNC OUT: START, 24 ticks a quarter at the tempo; SYNC IN: a clock at 125 BPM is followed, tempo and phase */
     {
         int32_t out[2 * CTL];

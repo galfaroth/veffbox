@@ -292,7 +292,7 @@ static void arp_16th(vb_player_t *p)
     if (p->nheld) {
         for (i = 0; i < p->nheld; i++)
             ns[n++] = p->held[i];
-    } else if (p->playing) {
+    } else if (p->playing && !p->manual) {
         const vb_chord_t *c = &hp->chord[p->step % VB_CHORD_STEPS];
         for (i = 0; i < c->n && i < 8; i++)
             ns[n++] = c->note[i];
@@ -342,6 +342,8 @@ static void on_16th(vb_player_t *p)
     uint32_t s16 = p->tick_q8 >> 8;
     if (pl->mode == VB_PLAY_ARP) {
         arp_16th(p);
+    } else if (p->manual) {
+        /* KEYS NEXT: the keys play the steps */
     } else if (pl->mode == VB_PLAY_CHORD) {
         if (p->step_left <= 0) {
             const vb_play_t *hp = p->harm && !p->rec ? p->harm : pl;   /* (a print plays its own: REBUILD) */
