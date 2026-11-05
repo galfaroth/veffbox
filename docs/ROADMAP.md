@@ -5,22 +5,21 @@ and screenshots of the new screens (`make shots`).
 
 ## Next
 
-The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in this order:
+The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in the order agreed on 2026-11-05:
 
 1. ~~Chords by degree (I, III ...), entered HiChord / Orchid style, jamming with them~~: done in 0.4.0.
-2. **Magic arp**: an arpeggiator that follows the chord playing (the step, or the pad), with the number of octaves;
-   also out over MIDI.
-3. **Notes and melodies**: enter a pool of notes (with the number of octaves) and a melody in order; RANDOMIZE it in
-   groups of three or four.
-4. **Tap the rhythm**: tapping any key plays the next note or chord of the melody / progression, as you tap (one-key
-   play), and records it.
-5. **Chords per track or global**: one progression for all tracks, or each track its own (with 6 below).
-6. **Several tracks at once** (item 2 of the old order below).
-7. **Play in sync**: MIDI clock in and out.
-8. **A built-in library** of sources and effects to browse and add (a few character sounds: rubbery basses, latex
+2. **Several tracks at once** (item 2 of the old order below).
+3. **Chords per track or global**: one progression for all tracks, or each track its own.
+4. **Play in sync**: MIDI clock in and out.
+5. **A built-in library** of sources and effects to browse and add (a few character sounds: rubbery basses, latex
    plucks, metallic hits).
-9. **A plugin version** for computers: the core is portable C, so a CLAP / VST3 plugin around it (VST.NET was
-   suggested; a C/C++ wrapper would reuse the code directly).
+6. **Magic arp**: an arpeggiator that follows the chord playing (the step, or the pad), with the number of octaves;
+   also out over MIDI.
+7. **Notes and melodies that land on the chord**: with a global progression, what you play (and the melodies you
+   enter, with the number of octaves, RANDOMIZE in groups of three or four) lands on the tones of the chord playing.
+8. **A planned sequence, played by any keys**: plan the notes / chords first; then any key you press plays the next
+   one, in your rhythm (one-key play), so you perform it without knowing where the notes are.
+9. **A plugin version** for computers (not ordered yet): the core is portable C, so a CLAP / VST3 plugin around it.
 
 The order agreed before:
 
