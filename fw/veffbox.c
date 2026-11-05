@@ -35,7 +35,7 @@ static volatile uint32_t fm1_ms;     /* milliseconds since boot (TIMER5 ISR) */
 struct { uint32_t magic, failed, pending; } bootguard __attribute__((section(".noinit")));
 
 /* the audio ISR's diagnostics (TIMER5 nests into the render; see fm1_timer5_irq) */
-static struct { uint32_t in_audio, nested, halves, late, max_us, last_us, timer_irqs, cpu_q8, cpu_rem; } vb_dbg;
+static struct { uint32_t in_audio, nested, halves, late, max_us, last_us, timer_irqs, cpu_q8, cpu_rem, erased; } vb_dbg;
 static volatile uint32_t t5_nested_ticks;
 
 #include "enc.c"
@@ -77,6 +77,7 @@ static int st_erase(uint32_t off)                   /* IRQs off: the DMA would l
     f = irq_save();
     audio_silence();
     rc = FL_FAR(fl_erase4k_ram)(off, &took);
+    vb_dbg.erased = 1;                                  /* (the audio half missed here is silence on purpose) */
     irq_restore(f);
     return rc;
 }
@@ -206,8 +207,9 @@ void fm1_alnk0_irq(void)
         }
         if (us > vb_dbg.max_us)
             vb_dbg.max_us = us;
-        if (fm1_audio_free_half() != half)
+        if (fm1_audio_free_half() != half && !vb_dbg.erased)
             vb_dbg.late++;
+        vb_dbg.erased = 0;
         vb_dbg.halves++;
     }
     vb_dbg.in_audio = 0;

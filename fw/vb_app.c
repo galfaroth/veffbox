@@ -2098,18 +2098,21 @@ static void vb_remote(void)
     ota_frame_done();
     switch (cmd) {
     case 1: {
-        static uint8_t r[6 + 5 * 21];
+        static uint8_t r[6 + 5 * 22];
         uint32_t k = 5, v, live = 0;
-        uint32_t f[21];
+        uint32_t f[22];
         for (v = 0; v < VB_POLY; v++)
             live += vb_pl.vlive[v];
         f[0] = vb_dbg.halves; f[1] = vb_dbg.late; f[2] = vb_dbg.max_us; f[3] = vb_dbg.last_us; f[4] = vb_dbg.cpu_q8;
         f[5] = vb_dbg.nested; f[6] = fm1_ms; f[7] = ui.page; f[8] = RC->src; f[9] = RC->play.mode;
         f[10] = vb_pl.playing; f[11] = live; f[12] = vb_ngen; f[13] = vb_pl.plen[vb_pl.cur]; f[14] = (uint32_t)vb_pl.peak;
         f[15] = ui.row[ui.page]; f[16] = vb_pl.rec; f[17] = ui.op; f[18] = vb_pl.nev; f[19] = (uint32_t)vb_pl.bpm10; f[20] = vb_master_q12;
+        f[21] = (uint32_t)(vb_tmute[0] | vb_tmute[1] << 1 | vb_tmute[2] << 2 | vb_tmute[3] << 3) | (uint32_t)vb_hsrc << 4 |
+                (uint32_t)vb_sync << 8 | (uint32_t)vb_nout << 10 |
+                (uint32_t)(vb_knext[0] | vb_knext[1] << 1 | vb_knext[2] << 2 | vb_knext[3] << 3) << 12 | (uint32_t)ui.track << 16;
         vb_pl.peak = 0;
         r[0] = 0xF0u; r[1] = 0x7Du; r[2] = 0x56u; r[3] = 0x42u; r[4] = 0x7Fu;
-        for (v = 0; v < 21u; v++, k += 5u)
+        for (v = 0; v < 22u; v++, k += 5u)
             put32(r + k, f[v]);
         r[k++] = 0xF7u;
         ota_wire_send(r, k);

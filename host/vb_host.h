@@ -62,7 +62,7 @@ static void midi_out_event(uint32_t pkt) { if (host_nmout < 4096u) host_mout[hos
 static int ota_frame_get(const uint8_t **p, uint32_t *n) { (void)p; (void)n; return 0; }
 static void ota_frame_done(void) {}
 static void ota_wire_send(const uint8_t *p, uint32_t n) { (void)p; (void)n; }
-static struct { uint32_t in_audio, nested, halves, late, max_us, last_us, timer_irqs, cpu_q8, cpu_rem; } vb_dbg;
+static struct { uint32_t in_audio, nested, halves, late, max_us, last_us, timer_irqs, cpu_q8, cpu_rem, erased; } vb_dbg;
 static unsigned str_len(const char *s) { return (unsigned)strlen(s); }
 static void str_cpy(char *d, const char *s, unsigned max)
 {

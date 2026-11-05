@@ -19,7 +19,7 @@ import mido
 BUTTONS = ["FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ", "PLAY", "REC", "OCT-", "OCT+"]
 ENCODERS = ["SELECT", "ALGO", "PRESET", "K1", "K2", "K3", "K4"]
 FIELDS = ["halves", "late", "max_us", "last_us", "cpu_q8", "nested", "ms", "page", "src", "mode", "playing", "voices",
-          "gens", "print_len", "peak", "row", "rec", "item", "events", "bpm10", "master_q12"]
+          "gens", "print_len", "peak", "row", "rec", "item", "events", "bpm10", "master_q12", "glo"]
 PAGES = ["SRC", "PLAY", "MOD", "FX", "PRINT", "BANK", "GLO"]
 SRCS = ["OP4", "ANLG", "DRUM", "SAMP", "GRAN", "CHOP"]
 HALF_US = 5805
@@ -81,7 +81,9 @@ def show(s):
           f"late {s['late']}  halves {s['halves']}  | page {PAGES[s['page']] if s['page'] < 7 else s['page']} "
           f"src {SRCS[s['src']] if s['src'] < 6 else s['src']} mode {s['mode']} playing {s['playing']} "
           f"voices {s['voices']} gens {s['gens']} print {s['print_len']} peak {s['peak']} rec {s['rec']} "
-          f"bpm {s['bpm10'] / 10} master {s.get('master_q12', 0)} row {s['row']} item {s['item']}")
+          f"bpm {s['bpm10'] / 10} master {s.get('master_q12', 0)} row {s['row']} item {s['item']}"
+          + (f"  | T{(s['glo'] >> 16 & 3) + 1} mute {s['glo'] & 15:04b} chords {s['glo'] >> 4 & 7} sync {s['glo'] >> 8 & 3} "
+             f"midi {s['glo'] >> 10 & 1} next {s['glo'] >> 12 & 15:04b}" if "glo" in s else ""))
 
 
 def run(r, words):
