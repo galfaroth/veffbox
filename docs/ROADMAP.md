@@ -13,8 +13,7 @@ The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in t
 4. ~~Play in sync~~: done in 0.7.0.
 5. ~~A built-in library~~: done in 0.8.0.
 6. ~~Magic arp~~: done in 0.9.0.
-7. **Notes and melodies that land on the chord**: with a global progression, what you play (and the melodies you
-   enter, with the number of octaves, RANDOMIZE in groups of three or four) lands on the tones of the chord playing.
+7. ~~Notes and melodies that land on the chord~~: done in 0.10.0.
 8. **A planned sequence, played by any keys**: plan the notes / chords first; then any key you press plays the next
    one, in your rhythm (one-key play), so you perform it without knowing where the notes are.
 9. **A plugin version** for computers (not ordered yet): the core is portable C, so a CLAP / VST3 plugin around it.
@@ -49,6 +48,9 @@ The order agreed before:
 
 ## Done
 
+- 0.10.0: SNAP (NOTE, SEQ: OFF, CHORD, SCALE): the keys and the sequence's notes moved to the nearest tone of the chord
+  playing (CHORDS' track or the own progression, by the sixteenth) or of KEY / SCALE; SEQ EDIT RND 3 / RND 4: a melody
+  of motifs (A, A up, A, B) in KEY / SCALE over RANGE 1-3 octaves, undoable.
 - 0.9.0: MODE ARP: the chord playing (own progression or CHORDS'), or the keys / pad chord held, UP DOWN UP-DN RND
   ORDER, 1-4 octaves, 1/16 1/8 1/4 1/32; held keys run it while stopped. MIDI on GLO: every track's notes out over USB
   (track n on channel n). host/test_arp.c.
