@@ -11,8 +11,7 @@ The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in t
 2. ~~Several tracks at once~~: done in 0.5.0.
 3. ~~Chords per track or global~~: done in 0.6.0.
 4. ~~Play in sync~~: done in 0.7.0.
-5. **A built-in library** of sources and effects to browse and add (a few character sounds: rubbery basses, latex
-   plucks, metallic hits).
+5. ~~A built-in library~~: done in 0.8.0.
 6. **Magic arp**: an arpeggiator that follows the chord playing (the step, or the pad), with the number of octaves;
    also out over MIDI.
 7. **Notes and melodies that land on the chord**: with a global progression, what you play (and the melodies you
@@ -51,6 +50,9 @@ The order agreed before:
 
 ## Done
 
+- 0.8.0: the library (core/vb_lib.c): 15 sources (LATEX, RUBBER BS, GLASS, METAL HIT, FM BELL, WOOD, BUZZ BASS,
+  SUPERSAW, PLASTIC, SUB BOOM, SYNC LEAD, BLIP, three kits) and 10 FX chains; LIB, the last row of SRC and a row of FX,
+  applies as you turn, hold SEL undoes the browsing. host/test_lib.c: every entry sounds, in range, bounded.
 - 0.7.0: SYNC on GLO. OUT: MIDI clock over USB from the audio thread (24 a quarter, START / STOP with PLAY). IN:
   START / STOP / CONTINUE run the tracks; the tempo from the ticks' times over each beat; at every sixteenth the phase
   is pulled half way to the clock's (host test: 125 BPM followed exactly, in phase after 20 s).
