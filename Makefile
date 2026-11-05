@@ -14,17 +14,17 @@ test: $(TESTS)
 	@for t in $(TESTS); do ./$$t || exit 1; done
 
 host/test_%: host/test_%.c $(CORE) $(wildcard core/*.h)
-	$(CC) $(CFLAGS) -o $@ $< $(CORE)
+	$(CC) $(CFLAGS) -o $@ $< $(CORE) -lm
 
 # the FM-1 screens as PNG (host/shots/), drawn by the firmware's own UI code with MNM-1's gfx.c and font
 shots: host/shot.c fw/vb_app.c $(CORE)
-	$(CC) -std=c11 -O1 -w -I$(MNM)/firmware/src -I$(MNM)/build/gen -o host/shot host/shot.c $(CORE) -lz
+	$(CC) -std=c11 -O1 -w -I$(MNM)/firmware/src -I$(MNM)/build/gen -o host/shot host/shot.c $(CORE) -lz -lm
 	@mkdir -p host/shots
 	./host/shot
 
 # the firmware's UI on the host, flash in RAM: steps, OCT, VOICING / BASS, songs, saving, a restart
 uitest: host/ui_test.c host/vb_host.h fw/vb_app.c $(CORE)
-	$(CC) -std=c11 -O1 -w -I$(MNM)/firmware/src -I$(MNM)/build/gen -o host/ui_test host/ui_test.c $(CORE)
+	$(CC) -std=c11 -O1 -w -I$(MNM)/firmware/src -I$(MNM)/build/gen -o host/ui_test host/ui_test.c $(CORE) -lm
 	./host/ui_test
 
 # the web emulator: the firmware as WebAssembly for site/emu/ (emscripten's emcc on the PATH)
