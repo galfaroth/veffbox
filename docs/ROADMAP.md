@@ -9,7 +9,7 @@ The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in t
 
 1. ~~Chords by degree (I, III ...), entered HiChord / Orchid style, jamming with them~~: done in 0.4.0.
 2. ~~Several tracks at once~~: done in 0.5.0.
-3. **Chords per track or global**: one progression for all tracks, or each track its own.
+3. ~~Chords per track or global~~: done in 0.6.0.
 4. **Play in sync**: MIDI clock in and out.
 5. **A built-in library** of sources and effects to browse and add (a few character sounds: rubbery basses, latex
    plucks, metallic hits).
@@ -51,6 +51,8 @@ The order agreed before:
 
 ## Done
 
+- 0.6.0: CHORDS on GLO: OWN, or every track in CHORD plays T1..T4's progression in step with its own sound, strum
+  and voices; that track's PLAY page edits the source's chords; RESAMPLE copies them into the recipe (REBUILD stays exact).
 - 0.5.0: four tracks at once. A player per track, mixed, PLAY / STOP for all; the selected track holds the FX
   buffers and the print (moved in the audio thread in two steps, cleared in the main loop between); in the background a
   track bypasses the buffered FX, a sampler source is silent, 5 voices; MUTE per track on GLO; players sleep after 1.5 s
