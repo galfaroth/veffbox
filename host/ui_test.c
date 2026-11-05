@@ -406,6 +406,68 @@ int main(void)
         pass(3000);
     }
 
+    /* SNAP: with CHORDS T1, T2's keys and its sequence land on T1's chord; RND 4 writes a melody of fours */
+    {
+        int32_t out[2 * CTL];
+        uint32_t b, k, bad = 0, n2 = 0, allowed = 0;
+        vb_recipe_t *r1, *r2;
+        boot(1);
+        r1 = snd(vb_track_sound[0]);
+        r2 = snd(vb_track_sound[1]);
+        vb_hsrc = 1;
+        harm_bind();
+        turn(EN_ALGO, 1);                                  /* T2 */
+        r2->play.mode = VB_PLAY_NOTE;
+        r2->snap = 1;
+        r1->play.sel = 0;
+        keyset(8, 1);                                      /* C#4 against T1's first chord */
+        {
+            uint8_t pcs[12];
+            int nn = vb_chord_tones(&r1->play.chord[0], pcs), ok = 0;
+            for (k = 0; k < (uint32_t)nn; k++)
+                ok |= key_note[8] % 12 == pcs[k];
+            CHECK(ok && key_note[8] != 61, "C#4 snapped onto T1's chord: %u", key_note[8]);
+        }
+        keyset(8, 0);
+        r2->play.mode = VB_PLAY_SEQ;
+        press_b(B_ARP);
+        ui.row[PG_PLAY] = 2;
+        ui.sact = 5;                                       /* RND 4 */
+        sel();
+        CHECK(r2->play.len == 16, "RND 4: 16 steps (%u)", r2->play.len);
+        for (k = 0; k < r2->play.len; k++)
+            r2->play.seq[k].note = (uint8_t)(50 + k);       /* anything: SNAP puts it on the chord */
+        {
+            uint32_t s;
+            for (s = 0; s < r1->play.len; s++) {
+                uint8_t pcs[12];
+                int nn = vb_chord_tones(&r1->play.chord[s], pcs), q;
+                for (q = 0; q < nn; q++)
+                    allowed |= 1u << pcs[q];
+            }
+        }
+        vb_nout = 1;
+        nout_bind();
+        host_nmout = 0;
+        press_b(B_PLAY);
+        for (b = 0; b < 5512u; b++)                        /* 4 s */
+            vb_audio_block(out, CTL);
+        press_b(B_PLAY);
+        for (k = 0; k < host_nmout; k++) {
+            uint32_t m = host_mout[k];
+            if ((m & 0xFFFFu) == (0x09u | 0x91u << 8)) {   /* T2's notes, channel 2 */
+                n2++;
+                bad += !((allowed >> (((m >> 16) & 0x7Fu) % 12u)) & 1u);
+            }
+        }
+        CHECK(n2 >= 8 && !bad, "T2's sequence on T1's chords: %u notes, %u off them", n2, bad);
+        vb_nout = 0;
+        vb_hsrc = 0;
+        nout_bind();
+        harm_bind();
+        pass(3000);
+    }
+
     /* SYNC OUT: START, 24 ticks a quarter at the tempo; SYNC IN: a clock at 125 BPM is followed, tempo and phase */
     {
         int32_t out[2 * CTL];

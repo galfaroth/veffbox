@@ -72,7 +72,8 @@ typedef struct {
     uint8_t key, scale;                   /* the harmony: KEY (0 = C) and SCALE (VB_SC_*); chords by degree use it */
     uint8_t cin;                          /* CHORD INPUT: 0 NOTES (the keys add notes), 1 DEGREE (the keys play chords) */
     uint8_t arp_pat, arp_oct, arp_rate;   /* ARP: the pattern (VB_ARP_*), octaves - 1, rate (0 1/16 1 1/8 2 1/4 3 1/32) */
-    uint8_t spare[2];                     /* zero; room for new parameters whose 0 keeps the old sound */
+    uint8_t snap;                         /* SNAP (NOTE, SEQ): 0 OFF, 1 the chord playing, 2 KEY / SCALE */
+    uint8_t mel_oct;                      /* RANGE of a random melody: octaves - 1 */
 } vb_recipe_t;
 
 /* parameter addresses: domain << 8 | index */
@@ -112,6 +113,15 @@ enum { VB_CM_7 = 1, VB_CM_6 = 2, VB_CM_SWAP = 4, VB_CM_SUS2 = 8, VB_CM_SUS4 = 16
 int vb_degree_chord(int key, int scale, int deg, int semis, int mods, int *root_pc);
 /* the chord's roman numeral in key / scale, in the chord names' style: "I", "IIm7", "V7", "bVIImaj7"; returns length */
 int vb_chord_roman(const vb_chord_t *c, int key, int scale, char *out, int max);
+
+/* the chord step playing at sixteenth pos (0 = the first) of a progression, its steps' lengths looping */
+int vb_chord_at(const vb_play_t *pl, uint32_t pos);
+/* note moved to the nearest of the pitch classes pcs (a tie goes down); n == 0: unchanged */
+int vb_snap(int note, const uint8_t *pcs, int n);
+/* KEY / SCALE as 7 pitch classes */
+void vb_scale_pcs(int key, int scale, uint8_t *pcs);
+/* a melody of motifs of `group` notes (3 or 4) in the scale over oct octaves from C3 + key: steps, len; rng: the seed */
+void vb_melody(vb_play_t *pl, int key, int scale, int group, int oct, uint32_t *rng);
 
 /* chord helpers */
 void vb_chord_fill(vb_chord_t *c, int root, int type, int base_note);

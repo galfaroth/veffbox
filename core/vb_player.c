@@ -365,8 +365,21 @@ static void on_16th(vb_player_t *p)
             p->seq_sub = PER[pl->rate & 3u];
             if (st->on && vb_rng(&p->rng) % 100u < st->prob) {
                 uint32_t dur = (uint32_t)p->seq_sub * s16;
-                ev_add(p, p->now, st->note, eplay[2], 1);
-                ev_add(p, p->now + (st->slide ? dur + 32u : dur / 2u), st->note, 0, 0);
+                int note = st->note;
+                if (p->rc->snap) {                         /* SNAP: onto the chord playing now, or the scale */
+                    uint8_t pcs[12];
+                    int n;
+                    if (p->rc->snap == 1u) {
+                        const vb_play_t *hp = p->harm && !p->rec ? p->harm : pl;
+                        n = vb_chord_tones(&hp->chord[vb_chord_at(hp, p->n16)], pcs);
+                    } else {
+                        vb_scale_pcs(p->rc->key, p->rc->scale, pcs);
+                        n = 7;
+                    }
+                    note = vb_snap(note, pcs, n);
+                }
+                ev_add(p, p->now, note, eplay[2], 1);
+                ev_add(p, p->now + (st->slide ? dur + 32u : dur / 2u), note, 0, 0);
             }
         }
         p->seq_sub--;

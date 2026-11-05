@@ -783,7 +783,9 @@ static const char *const CIN_N[2] = {"NOTES", "DEGREE"};
 static const char *const MUTE_N[2] = {"PLAY", "MUTE"};
 static const char *const HSRC_N[VB_TRACKS + 1] = {"OWN", "T1", "T2", "T3", "T4"};
 static const char *const SYNC_N[3] = {"INT", "OUT", "IN"};
-static const char *const SACT_N[4] = {"ON/OFF", "INS", "DUP", "DEL"};
+static const char *const SACT_N[6] = {"ON/OFF", "INS", "DUP", "DEL", "RND 3", "RND 4"};
+static const char *const SNAP_N[3] = {"OFF", "CHORD", "SCALE"};
+static const char *const RANGE_N[3] = {"1 OCT", "2 OCT", "3 OCT"};
 static const char *const SAMP_LBL[8] = {"START", "LEN", "LOOP", "REV", "PITCH", "FINE", "FADE", "GAIN"};
 static const char *const SAMP_LOOP_N[3] = {"OFF", "FWD", "P-P"};
 
@@ -893,10 +895,17 @@ static void build_rows(void)
             cl(2, 0, "VEL", K_U8, F_NUM, &pl->vel, 1, 127, 0, VB_ADDR(VB_D_PLAY, 2), 0);
             cl(2, 1, "RATE", K_U8, F_LIST, &pl->rate, 0, 2, RATE_N, VB_ADDR_NONE, 0);
             cl(2, 2, "STEPS", K_STEPS, F_NUM, &pl->len, 1, VB_SEQ_STEPS, 0, VB_ADDR_NONE, 0);
-            cl(2, 3, "EDIT", K_U8, F_LIST, &ui.sact, 0, 3, SACT_N, VB_ADDR_NONE, 0);
-            NR = 3;
+            cl(2, 3, "EDIT", K_U8, F_LIST, &ui.sact, 0, 5, SACT_N, VB_ADDR_NONE, 0);
+            cl(3, 0, "SNAP", K_U8, F_LIST, &RC->snap, 0, 2, SNAP_N, VB_ADDR_NONE, 0);
+            cl(3, 1, "RANGE", K_U8, F_LIST, &RC->mel_oct, 0, 2, RANGE_N, VB_ADDR_NONE, 0);
+            cl(3, 2, "KEY", K_U8, F_LIST, &RC->key, 0, 11, NOTE_NM, VB_ADDR_NONE, 0);
+            cl(3, 3, "SCALE", K_U8, F_LIST, &RC->scale, 0, VB_SCALES - 1, vb_scale_name, VB_ADDR_NONE, 0);
+            NR = 4;
         } else {
             cl(1, 0, "VEL", K_U8, F_NUM, &pl->vel, 1, 127, 0, VB_ADDR(VB_D_PLAY, 2), 0);
+            cl(1, 1, "SNAP", K_U8, F_LIST, &RC->snap, 0, 2, SNAP_N, VB_ADDR_NONE, 0);
+            cl(1, 2, "KEY", K_U8, F_LIST, &RC->key, 0, 11, NOTE_NM, VB_ADDR_NONE, 0);
+            cl(1, 3, "SCALE", K_U8, F_LIST, &RC->scale, 0, VB_SCALES - 1, vb_scale_name, VB_ADDR_NONE, 0);
             NR = 2;
         }
         break;
@@ -1440,6 +1449,14 @@ static void step_edit(void)
     int sel = pl->sel % max, act = seq ? ui.sact : ui.cact + 1;        /* 0 ON/OFF, 1 INS, 2 DUP, 3 DEL */
     if (RC->play.mode == VB_PLAY_NOTE)
         return;
+    if (seq && act >= 4) {                                 /* a melody of motifs of 3 or 4, in KEY / SCALE */
+        undo_mark();
+        vb_melody(pl, RC->key, RC->scale, act == 4 ? 3 : 4, 1 + RC->mel_oct, &ui.rng);
+        say(act == 4 ? "MELODY IN THREES" : "MELODY IN FOURS");
+        touch();
+        dirty();
+        return;
+    }
     if (act == 0) {
         pl->seq[sel].on ^= 1u;
     } else if (act == 3) {
@@ -1738,6 +1755,25 @@ static void chord_pad(uint32_t n, int down)
     }
 }
 
+/* SNAP: a key's note onto the chord playing now (CHORDS' track, or the track's own progression; stopped: the selected
+ * chord), or onto KEY / SCALE */
+static int snap_key(int note)
+{
+    uint8_t pcs[12];
+    int n;
+    if (RC->snap == 2u) {
+        vb_scale_pcs(RC->key, RC->scale, pcs);
+        n = 7;
+    } else {
+        const vb_player_t *s = vb_hsrc ? vb_P[vb_hsrc - 1u] : &vb_pl;
+        const vb_play_t *h = &s->rc->play;
+        int st = s->playing ? vb_chord_at(h, s->n16 ? s->n16 - 1u : 0u) : h->sel % VB_CHORD_STEPS;
+        n = vb_chord_tones(&h->chord[st], pcs);
+    }
+    return vb_snap(note, pcs, n);
+}
+static uint8_t key_note[27];                               /* the note each key sounds (SNAP may move it) */
+
 static void key(uint32_t n, int down)
 {
     int note = 53 + (int)n + 12 * ((int)ui.oct - 2);       /* key 0 = F3 at OCT 0 */
@@ -1747,9 +1783,17 @@ static void key(uint32_t n, int down)
         return;
     }
     if (!down) {
+        if (n < 27u && key_note[n]) {
+            note = key_note[n];
+            key_note[n] = 0;
+        }
         vb_player_note(&vb_pl, note, 0, 0);
         return;
     }
+    if (RC->snap && n < 27u && (pl->mode == VB_PLAY_NOTE || (pl->mode == VB_PLAY_SEQ && ui.page != PG_PLAY)))
+        note = snap_key(note);
+    if (n < 27u)
+        key_note[n] = (uint8_t)note;
     if (ui.page == PG_PLAY && pl->mode == VB_PLAY_CHORD) {
         vb_chord_t *ch = &PLC()->chord[PLC()->sel % VB_CHORD_STEPS];
         uint32_t i;

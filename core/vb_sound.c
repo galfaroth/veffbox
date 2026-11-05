@@ -579,3 +579,77 @@ int vb_chord_roman(const vb_chord_t *c, int key, int scale, char *out, int max)
     }
     return vb_cat(out, at, ty >= 0 ? CHORD_SUFFIX[ty] : "?", max);
 }
+
+int vb_chord_at(const vb_play_t *pl, uint32_t pos)
+{
+    uint32_t tot = 0, i, len = pl->len ? pl->len : 1u;
+    if (len > VB_CHORD_STEPS)
+        len = VB_CHORD_STEPS;
+    for (i = 0; i < len; i++)
+        tot += vb_len16[pl->chord[i].len_i % 12u];
+    pos %= tot ? tot : 1u;
+    for (i = 0; i < len; i++) {
+        uint32_t l = vb_len16[pl->chord[i].len_i % 12u];
+        if (pos < l)
+            return (int)i;
+        pos -= l;
+    }
+    return 0;
+}
+
+int vb_snap(int note, const uint8_t *pcs, int n)
+{
+    int d, i, s;
+    for (d = 0; d <= 6 && n > 0; d++)
+        for (s = -1; s <= 1; s += 2) {                     /* below first: a tie goes down */
+            int c = note + s * d;
+            for (i = 0; i < n; i++)
+                if ((c % 12 + 12) % 12 == pcs[i])
+                    return c < 0 ? c + 12 : c > 127 ? c - 12 : c;
+        }
+    return note;
+}
+
+void vb_scale_pcs(int key, int scale, uint8_t *pcs)
+{
+    int i;
+    for (i = 0; i < 7; i++)
+        pcs[i] = (uint8_t)((key + vb_scale_iv[scale % VB_SCALES][i]) % 12);
+}
+
+static uint32_t mrng(uint32_t *s)
+{
+    *s ^= *s << 13;
+    *s ^= *s >> 17;
+    *s ^= *s << 5;
+    return *s;
+}
+void vb_melody(vb_play_t *pl, int key, int scale, int group, int oct, uint32_t *rng)
+{
+    const uint8_t *iv = vb_scale_iv[scale % VB_SCALES];
+    int n = 7 * (oct < 1 ? 1 : oct > 3 ? 3 : oct) + 1, a[4], b[4], i, k, g = group == 3 ? 3 : 4, len = g * 4;
+    static const int8_t STEP[6] = {-2, -1, -1, 1, 1, 2};
+    if (!*rng)
+        *rng = 0x2545F491u;
+    for (k = 0; k < 2; k++) {                              /* motifs A and B: steps through the scale */
+        int *m = k ? b : a;
+        m[0] = (int)(mrng(rng) % (uint32_t)n);
+        for (i = 1; i < g; i++) {
+            m[i] = m[i - 1] + STEP[mrng(rng) % 6u];
+            m[i] = m[i] < 0 ? -m[i] : m[i] >= n ? 2 * (n - 1) - m[i] : m[i];
+        }
+    }
+    for (k = 0; k < 4; k++)                                /* A, A a step or two up, A, B */
+        for (i = 0; i < g; i++) {
+            int d = k == 1 ? a[i] + 1 + (int)(a[0] % 2) : k == 3 ? b[i] : a[i];
+            vb_step_t *st = &pl->seq[k * g + i];
+            if (d >= n)
+                d = n - 1;
+            st->note = (uint8_t)(48 + key + 12 * (d / 7) + iv[d % 7]);
+            st->on = (uint8_t)(i == 0 || mrng(rng) % 8u != 0u);   /* now and then a rest, never on the first */
+            st->slide = 0;
+            st->prob = 100;
+        }
+    pl->len = (uint8_t)len;
+    pl->sel = 0;
+}
