@@ -82,6 +82,7 @@ static vb_player_t vb_pbg[VB_TRACKS - 1] __attribute__((section(".pool")));
 static vb_player_t *const vb_P[VB_TRACKS] = {&vb_p0, &vb_pbg[0], &vb_pbg[1], &vb_pbg[2]};
 static volatile uint8_t vb_sel, vb_sel_to;                 /* the player holding the buffers (0xFF: none), the one asked to */
 static vb_bufs_t vb_bufs;                                  /* the buffers while no player holds them */
+static volatile uint8_t vb_lead;                           /* the last track that held them (always 0..3): the tempo */
 static uint8_t vb_tmute[VB_TRACKS];                        /* GLO: 1 = the track is muted */
 static uint8_t vb_bound[VB_TRACKS];                        /* the sound each player was given last (0xFF: none) */
 #define vb_pl (*vb_P[ui.track])                            /* the selected track's player */
@@ -97,6 +98,7 @@ static void vb_sel_step(void)                              /* the audio thread's
     } else if (vb_sel == 0xFFu && vb_sel_to < VB_TRACKS) { /* 3: into the new one (cleared in between) */
         vb_player_attach(vb_P[vb_sel_to], &vb_bufs);
         vb_P[vb_sel_to]->poly = 0;
+        vb_lead = vb_sel_to;
         vb_sel = vb_sel_to;
     }
 }
@@ -119,7 +121,7 @@ static void vb_audio_block(int32_t *out, uint32_t n)        /* audio ISR */
     for (i = 0; i < n; i++)
         vb_mix[i] = 0;
     for (t = 0; t < VB_TRACKS; t++) {                       /* (a muted track runs on, unheard: it stays in time) */
-        vb_P[t]->bpm10 = vb_P[vb_sel]->bpm10;
+        vb_P[t]->bpm10 = vb_P[vb_lead]->bpm10;
         vb_player_render(vb_P[t], vb_mono, (int)n);
         if (!vb_tmute[t])
             for (i = 0; i < n; i++)
@@ -639,7 +641,7 @@ static void vb_init(void)
         vb_bound[i] = 0xFFu;
         vb_P[i]->poly = i ? VB_BG_POLY : 0;
     }
-    vb_sel = vb_sel_to = 0;
+    vb_sel = vb_sel_to = vb_lead = 0;
     ui.track = 0;
     ui.chaos = 70;
     ui.learn_src = -1;

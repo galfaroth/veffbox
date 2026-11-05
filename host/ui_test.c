@@ -281,6 +281,14 @@ int main(void)
         CHECK(vb_P[1]->peak > 1000 && vb_P[2]->peak > 1000, "T2 and T3 sound in the background (%d %d)", vb_P[1]->peak,
               vb_P[2]->peak);
         CHECK(vb_P[0]->fx[0].buf && !vb_P[1]->fx[0].buf && vb_P[0]->pbuf[0] && !vb_P[1]->pbuf[0], "T1 holds the buffers");
+        vb_sel_to = 0xFFu;                                 /* the audio thread mid-move: no player holds the buffers */
+        for (b = 0; b < 4u; b++)
+            vb_audio_block(out, CTL);
+        CHECK(vb_sel == 0xFFu && !vb_P[0]->fx[0].buf, "mid-move: the buffers held by none");
+        vb_sel_to = 0;
+        for (b = 0; b < 4u; b++)
+            vb_audio_block(out, CTL);
+        CHECK(vb_sel == 0 && vb_P[0]->fx[0].buf, "back on T1");
         turn(EN_ALGO, 1);                                  /* track 2 selected: the buffers move */
         for (b = 0; b < 8u; b++)
             vb_audio_block(out, CTL);
