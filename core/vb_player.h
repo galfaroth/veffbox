@@ -56,6 +56,7 @@ typedef struct {
     uint32_t rec_pos, rec_target, rec_quiet, rec_note_off;
     int32_t rec_pair;
     int32_t peak;                        /* output peak since the UI last read it */
+    uint32_t hush;                       /* blocks of silence, stopped and with nothing pending: it sleeps after 2000 */
     int32_t block[32];
     void (*idle)(void);                  /* called during long offline renders (the watchdog) */
 } vb_player_t;

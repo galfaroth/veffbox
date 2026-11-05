@@ -670,8 +670,14 @@ void vb_player_render(vb_player_t *p, int32_t *out, int n)
 {
     vb_recipe_t *rc = p->rc;
     int32_t *blk = p->block, gain;
-    uint32_t v;
+    uint32_t v, any = 0;
     int i;
+    if (p->hush >= 2000u && !p->playing && !p->rec && !p->nev && p->cmd_r == p->cmd_w) {
+        for (i = 0; i < n; i++)                  /* asleep (1.5 s of silence, stopped): a note or PLAY wakes it */
+            out[i] = 0;
+        p->now += (uint32_t)n;
+        return;
+    }
     if (rc->src != p->eng_src) {
         p->eng_src = rc->src;
         p->eng = engine_of(rc->src);
@@ -709,6 +715,7 @@ void vb_player_render(vb_player_t *p, int32_t *out, int n)
     for (i = 0; i < n; i++) {
         int32_t s = vb_tanh(vb_clamp(blk[i], -131068, 131068) / 4);   /* a soft limiter: tanh, never past full scale */
         out[i] = s;
+        any |= (uint32_t)s;
         if (s > p->peak)
             p->peak = s;
         else if (-s > p->peak)
@@ -717,4 +724,5 @@ void vb_player_render(vb_player_t *p, int32_t *out, int n)
     if (p->rec)
         print_capture(p, out, n);
     p->now += (uint32_t)n;
+    p->hush = any || p->playing || p->rec ? 0 : p->hush + 1u;
 }
