@@ -719,6 +719,18 @@ static void reset(vb_fx_state_t *s, uint8_t type)
             s->buf[i] = 0;
 }
 
+void vb_fx_attach(vb_fx_state_t *s, int16_t *buf)
+{
+    if (vb_fx_needs_buf(s->type)) {                  /* a fresh start on the (cleared) buffer, or none: no clearing here */
+        int16_t *keep = buf;
+        s->buf = 0;
+        reset(s, s->type);
+        s->buf = keep;
+    } else {
+        s->buf = buf;                                /* (the others keep their state: no click) */
+    }
+}
+
 int vb_fx_needs_buf(int type)
 {
     return type == VB_FX_TAPE || type == VB_FX_REVERB || type == VB_FX_CHORUS || type == VB_FX_RESON ||

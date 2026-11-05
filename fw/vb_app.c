@@ -80,16 +80,25 @@ static vb_recipe_t vb_undo_rc __attribute__((section(".pool")));
 static vb_player_t vb_p0;                                  /* track 1 in .bss, the others in the pool */
 static vb_player_t vb_pbg[VB_TRACKS - 1] __attribute__((section(".pool")));
 static vb_player_t *const vb_P[VB_TRACKS] = {&vb_p0, &vb_pbg[0], &vb_pbg[1], &vb_pbg[2]};
-static volatile uint8_t vb_sel, vb_sel_to;                 /* the player holding the buffers, the one asked to */
+static volatile uint8_t vb_sel, vb_sel_to;                 /* the player holding the buffers (0xFF: none), the one asked to */
+static vb_bufs_t vb_bufs;                                  /* the buffers while no player holds them */
 static uint8_t vb_tmute[VB_TRACKS];                        /* GLO: 1 = the track is muted */
 static uint8_t vb_bound[VB_TRACKS];                        /* the sound each player was given last (0xFF: none) */
 #define vb_pl (*vb_P[ui.track])                            /* the selected track's player */
 #define VB_BG_POLY 5                                       /* voices for a track in the background (a 4-note chord + BASS) */
-static void vb_give(uint32_t from, uint32_t to)
+static void vb_sel_step(void)                              /* the audio thread's part of a track change */
 {
-    vb_player_give(vb_P[from], vb_P[to]);
-    vb_P[from]->poly = VB_BG_POLY;
-    vb_P[to]->poly = 0;
+    if (vb_sel_to == vb_sel)
+        return;
+    if (vb_sel != 0xFFu && vb_sel_to == 0xFFu) {           /* 1: out of the old player */
+        vb_player_detach(vb_P[vb_sel], &vb_bufs);
+        vb_P[vb_sel]->poly = VB_BG_POLY;
+        vb_sel = 0xFFu;
+    } else if (vb_sel == 0xFFu && vb_sel_to < VB_TRACKS) { /* 3: into the new one (cleared in between) */
+        vb_player_attach(vb_P[vb_sel_to], &vb_bufs);
+        vb_P[vb_sel_to]->poly = 0;
+        vb_sel = vb_sel_to;
+    }
 }
 static volatile uint32_t vb_master_q12 = 2048;
 
@@ -101,10 +110,7 @@ static volatile uint8_t vb_mute;                           /* REBUILD renders of
 static void vb_audio_block(int32_t *out, uint32_t n)        /* audio ISR */
 {
     uint32_t i, t;
-    if (vb_sel_to != vb_sel) {                             /* a new track selected: the buffers move to its player */
-        vb_give(vb_sel, vb_sel_to);
-        vb_sel = vb_sel_to;
-    }
+    vb_sel_step();                                         /* a new track selected: the buffers move to its player */
     if (vb_mute) {
         for (i = 0; i < 2u * n; i++)
             out[i] = 0;
@@ -126,16 +132,26 @@ static void vb_audio_block(int32_t *out, uint32_t n)        /* audio ISR */
     }
 }
 /* the buffers to track t's player, from the audio thread at its next block (directly when no audio runs: the host) */
-static void sel_player(uint32_t t)
+static void sel_wait(uint32_t want)
 {
     uint32_t i;
-    vb_sel_to = (uint8_t)t;
-    for (i = 0; i < 40u && vb_sel != t; i++)
+    for (i = 0; i < 40u && vb_sel != want; i++)
         fm1_delay_ms(1);
-    if (vb_sel != t) {
-        vb_give(vb_sel, t);
-        vb_sel = (uint8_t)t;
-    }
+    if (vb_sel != want)                                    /* (no audio thread: the host) */
+        vb_sel_step();
+}
+static void sel_player(uint32_t t)
+{
+    uint32_t i, k;
+    if (vb_sel == t)
+        return;
+    vb_sel_to = 0xFFu;                                     /* 1: the audio thread takes them out */
+    sel_wait(0xFFu);
+    for (i = 0; i < VB_FX_SLOTS; i++)                      /* 2: cleared here, not in the audio thread */
+        for (k = 0; vb_bufs.fx[i] && k < VB_FX_BUF; k++)
+            vb_bufs.fx[i][k] = 0;
+    vb_sel_to = (uint8_t)t;                                /* 3: and into the new player */
+    sel_wait(t);
 }
 static void transport(int on)                              /* PLAY / STOP: every track together */
 {

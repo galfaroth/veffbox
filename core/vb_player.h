@@ -65,8 +65,11 @@ typedef struct {
 void vb_player_init(vb_player_t *p, vb_recipe_t *rc, int16_t *fxbuf /* VB_FX_SLOTS * VB_FX_BUF */,
                     int16_t *print_a, int16_t *print_b, uint32_t print_cap);
 /* fxbuf and the prints may be 0: a track in the background (its buffered FX bypassed, a sampler source silent).
- * vb_player_give moves them (cleared) from one player to another, with the audio stopped for both. */
-void vb_player_give(vb_player_t *from, vb_player_t *to);
+ * They move between players: detach takes them out, attach gives them (the FX buffers cleared in between); both
+ * cheap, for the audio thread */
+typedef struct { int16_t *fx[VB_FX_SLOTS]; int16_t *pbuf[2]; uint32_t plen[2], pcap; uint8_t cur; } vb_bufs_t;
+void vb_player_detach(vb_player_t *p, vb_bufs_t *b);
+void vb_player_attach(vb_player_t *p, const vb_bufs_t *b);
 /* UI side (any thread): a note on/off from the keys, transport, print */
 void vb_player_note(vb_player_t *p, int note, int vel, int on);
 void vb_player_play(vb_player_t *p, int on);

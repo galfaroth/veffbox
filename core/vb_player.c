@@ -600,32 +600,42 @@ void vb_player_load(vb_player_t *p, uint32_t len)
     cmd_push(p, CMD(C_SWAP, 0, 0));
 }
 
-/* ---- the buffers move between players (the selected track has them); call with the audio stopped for both */
-void vb_player_give(vb_player_t *from, vb_player_t *to)
+/* ---- the buffers move between players (the selected track has them), in two cheap steps in the audio thread; the
+ * FX buffers are cleared between them, outside it */
+void vb_player_detach(vb_player_t *p, vb_bufs_t *b)
 {
-    uint32_t i, k;
+    uint32_t i;
     for (i = 0; i < VB_FX_SLOTS; i++) {
-        int16_t *b = from->fx[i].buf;
-        for (k = 0; b && k < VB_FX_BUF; k++)
-            b[k] = 0;
-        vb_fx_init(&to->fx[i], b, to->rc->seed + 1013u * (i + 1u));
-        vb_fx_init(&from->fx[i], 0, from->rc->seed + 1013u * (i + 1u));
+        b->fx[i] = p->fx[i].buf;
+        vb_fx_attach(&p->fx[i], 0);
     }
-    to->pbuf[0] = from->pbuf[0];
-    to->pbuf[1] = from->pbuf[1];
-    to->plen[0] = from->plen[0];
-    to->plen[1] = from->plen[1];
-    to->pcap = from->pcap;
-    to->cur = from->cur;
-    from->pbuf[0] = from->pbuf[1] = 0;
-    from->plen[0] = from->plen[1] = 0;
-    from->rec = 0;
-    if (to->pbuf[0])
-        vb_samp_set_buffer(to->pbuf[to->cur], to->plen[to->cur]);
-    if (to->eng == &vb_samp || to->eng == &vb_gran || to->eng == &vb_chop)
-        voices_reset(to);
-    if (from->eng == &vb_samp || from->eng == &vb_gran || from->eng == &vb_chop)
-        voices_reset(from);
+    b->pbuf[0] = p->pbuf[0];
+    b->pbuf[1] = p->pbuf[1];
+    b->plen[0] = p->plen[0];
+    b->plen[1] = p->plen[1];
+    b->pcap = p->pcap;
+    b->cur = p->cur;
+    p->pbuf[0] = p->pbuf[1] = 0;
+    p->plen[0] = p->plen[1] = 0;
+    p->rec = 0;
+    if (p->eng == &vb_samp || p->eng == &vb_gran || p->eng == &vb_chop)
+        voices_reset(p);
+}
+void vb_player_attach(vb_player_t *p, const vb_bufs_t *b)
+{
+    uint32_t i;
+    for (i = 0; i < VB_FX_SLOTS; i++)
+        vb_fx_attach(&p->fx[i], b->fx[i]);
+    p->pbuf[0] = b->pbuf[0];
+    p->pbuf[1] = b->pbuf[1];
+    p->plen[0] = b->plen[0];
+    p->plen[1] = b->plen[1];
+    p->pcap = b->pcap;
+    p->cur = b->cur;
+    if (p->pbuf[0])
+        vb_samp_set_buffer(p->pbuf[p->cur], p->plen[p->cur]);
+    if (p->eng == &vb_samp || p->eng == &vb_gran || p->eng == &vb_chop)
+        voices_reset(p);
 }
 
 /* ---- the block */

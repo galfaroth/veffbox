@@ -38,6 +38,8 @@ typedef struct {
 void vb_fx_init(vb_fx_state_t *s, int16_t *buf, uint32_t seed);   /* buf may be 0: the types that need one bypass */
 /* the type keeps audio in the slot's buffer (TAPE REVERB CHORUS RESON FREEZE SHIFT) */
 int vb_fx_needs_buf(int type);
+/* the slot's buffer changes (0: none), in the audio thread: cheap, the buffer must be cleared already */
+void vb_fx_attach(vb_fx_state_t *s, int16_t *buf);
 /* processes n samples in place. note: the last played MIDI note (RING / RESON follow it), bpm10: tempo x 10 */
 void vb_fx_process(vb_fx_state_t *s, const vb_fx_slot_t *slot, int32_t *io, int n, int note, int bpm10);
 
