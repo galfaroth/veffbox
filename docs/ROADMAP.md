@@ -28,6 +28,8 @@ and screenshots of the new screens (`make shots`).
 - CHOP's transient detection runs in the audio ISR (52% peak on the first detection): move it to the main loop.
 - The 63% spike at the start of a resample: the FX buffers are cleared in the ISR.
 - USB audio not yet verified by recording, because macOS blocks the microphone for the build session.
+- Knob jumps: TAPE TIME, CHORUS, SHIFT, PHASER and RESON step 4-14x the signal's own steepest step after a big knob
+  jump (host/test_fx.c "known:" lines; found when CI ran the tests on Linux). Their glides (~12 ms) are too fast.
 - The Firmware Hub: the reply to Sven (the V15 test is done), then the listing.
 
 ## Done
