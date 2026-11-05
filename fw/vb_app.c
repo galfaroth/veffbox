@@ -67,31 +67,74 @@ static int16_t vb_print_b[VB_PRINT_CAP];
 #define VB_BANK 64
 #define VB_GENS VB_MAXGEN
 #define VB_TRACKS 4
-static vb_recipe_t vb_bank[VB_BANK] __attribute__((section(".pool")));
+/* the bank's 64 sounds live in flash; RAM holds the ones in use (snd()): the 4 tracks' and the latest others */
+#define VB_SLOTS 8
+static vb_recipe_t vb_slot[VB_SLOTS] __attribute__((section(".pool")));
+static uint8_t vb_slot_snd[VB_SLOTS];                       /* the sound in each slot, 0xFF: none */
+static uint32_t vb_slot_used[VB_SLOTS], vb_slot_clock;
 static vb_gen_t vb_gen[VB_GENS] __attribute__((section(".pool")));
 static uint8_t vb_ngen, vb_curgen;
 static vb_recipe_t vb_undo_rc __attribute__((section(".pool")));
-static vb_player_t vb_pl;
+/* a player per track, all sounding at once. The selected one holds the FX buffers and the prints (it moves them on a
+ * track change, in the audio thread); the others play their synths and their FX that need no buffer */
+static vb_player_t vb_p0;                                  /* track 1 in .bss, the others in the pool */
+static vb_player_t vb_pbg[VB_TRACKS - 1] __attribute__((section(".pool")));
+static vb_player_t *const vb_P[VB_TRACKS] = {&vb_p0, &vb_pbg[0], &vb_pbg[1], &vb_pbg[2]};
+static volatile uint8_t vb_sel, vb_sel_to;                 /* the player holding the buffers, the one asked to */
+static uint8_t vb_tmute[VB_TRACKS];                        /* GLO: 1 = the track is muted */
+static uint8_t vb_bound[VB_TRACKS];                        /* the sound each player was given last (0xFF: none) */
+#define vb_pl (*vb_P[ui.track])                            /* the selected track's player */
 static volatile uint32_t vb_master_q12 = 2048;
 
 static vb_recipe_t *RC;                                    /* the sound on the selected track */
 static uint8_t vb_track_sound[VB_TRACKS] = {0, 1, 2, 3};
 
-static int32_t vb_mono[CTL];
+static int32_t vb_mono[CTL], vb_mix[CTL];
 static volatile uint8_t vb_mute;                           /* REBUILD renders offline: the ISR stays out */
 static void vb_audio_block(int32_t *out, uint32_t n)        /* audio ISR */
 {
-    uint32_t i;
+    uint32_t i, t;
+    if (vb_sel_to != vb_sel) {                             /* a new track selected: the buffers move to its player */
+        vb_player_give(vb_P[vb_sel], vb_P[vb_sel_to]);
+        vb_sel = vb_sel_to;
+    }
     if (vb_mute) {
         for (i = 0; i < 2u * n; i++)
             out[i] = 0;
         return;
     }
-    vb_player_render(&vb_pl, vb_mono, (int)n);
-    for (i = 0; i < n; i++) {
-        out[2u * i] = vb_mono[i];
-        out[2u * i + 1u] = vb_mono[i];
+    for (i = 0; i < n; i++)
+        vb_mix[i] = 0;
+    for (t = 0; t < VB_TRACKS; t++) {                       /* (a muted track runs on, unheard: it stays in time) */
+        vb_P[t]->bpm10 = vb_P[vb_sel]->bpm10;
+        vb_player_render(vb_P[t], vb_mono, (int)n);
+        if (!vb_tmute[t])
+            for (i = 0; i < n; i++)
+                vb_mix[i] += vb_mono[i];
     }
+    for (i = 0; i < n; i++) {
+        int32_t s = vb_mix[i] > 32767 ? 32767 : vb_mix[i] < -32768 ? -32768 : vb_mix[i];
+        out[2u * i] = s;
+        out[2u * i + 1u] = s;
+    }
+}
+/* the buffers to track t's player, from the audio thread at its next block (directly when no audio runs: the host) */
+static void sel_player(uint32_t t)
+{
+    uint32_t i;
+    vb_sel_to = (uint8_t)t;
+    for (i = 0; i < 40u && vb_sel != t; i++)
+        fm1_delay_ms(1);
+    if (vb_sel != t) {
+        vb_player_give(vb_P[vb_sel], vb_P[t]);
+        vb_sel = (uint8_t)t;
+    }
+}
+static void transport(int on)                              /* PLAY / STOP: every track together */
+{
+    uint32_t t;
+    for (t = 0; t < VB_TRACKS; t++)
+        vb_player_play(vb_P[t], on);
 }
 static void vb_master(int32_t *out, uint32_t n)            /* the MASTER knob, for the speaker and headphones */
 {
@@ -100,7 +143,12 @@ static void vb_master(int32_t *out, uint32_t n)            /* the MASTER knob, f
     for (i = 0; i < 2u * n; i++)
         out[i] = (out[i] * g) >> 11;
 }
-static void vb_all_off(void) { vb_player_panic(&vb_pl); }
+static void vb_all_off(void)
+{
+    uint32_t t;
+    for (t = 0; t < VB_TRACKS; t++)
+        vb_player_panic(vb_P[t]);
+}
 
 /* ---- UI state */
 enum { PG_SRC, PG_PLAY, PG_MOD, PG_FX, PG_PRINT, PG_BANK, PG_GLO, NPG };
@@ -201,6 +249,7 @@ static void save_settings(void)
     vb_sec[13] = ui.chaos;
     vb_sec[14] = (uint8_t)(vb_pl.bpm10 & 0xFF);
     vb_sec[15] = (uint8_t)(vb_pl.bpm10 >> 8);
+    vb_sec[16] = (uint8_t)(vb_tmute[0] | vb_tmute[1] << 1 | vb_tmute[2] << 2 | vb_tmute[3] << 3 | 0xF0u);
     {
         uint16_t c = vb_crc16(vb_sec + 8, 24);
         vb_sec[4] = (uint8_t)c;
@@ -283,12 +332,22 @@ static void save_sound(void)
 
 static uint32_t vb_dirty_snd[2];                                   /* bank sounds changed since the last save */
 static vb_recipe_t vb_scratch __attribute__((section(".pool")));
+static int snd_find(uint32_t s)
+{
+    int i;
+    for (i = 0; i < (int)VB_SLOTS; i++)
+        if (vb_slot_snd[i] == s)
+            return i;
+    return -1;
+}
 static void save_other(uint32_t s)                                 /* a sound not on screen: its stored generations kept */
 {
-    int cg = 0, n = -1;
+    int cg = 0, n = -1, i = snd_find(s);
+    if (i < 0)                                                     /* (not in RAM: nothing new to save) */
+        return;
     if (!st_read(VB_FL_SOUND(s), vb_sec, VB_SECTOR))
         n = vb_sound_unpack(vb_sec, &vb_scratch, vb_gen, VB_GENS, &cg);
-    if (vb_sound_pack(&vb_bank[s], vb_gen, n > 0 ? n : 0, cg, vb_sec) >= 0)
+    if (vb_sound_pack(&vb_slot[i], vb_gen, n > 0 ? n : 0, cg, vb_sec) >= 0)
         fl_put_sector(VB_FL_SOUND(s), vb_sec);
 }
 static void vb_save_now(void)
@@ -318,6 +377,57 @@ static void touch(void)                                            /* something 
     vb_st.dirty = 1;
     vb_st.due = fm1_ms + 2500u;
 }
+/* a new bank sound's recipe (sounds 2 and 3 start as a line and a beat) */
+static void sound_default(uint32_t s, vb_recipe_t *r)
+{
+    uint32_t i;
+    vb_recipe_default(r, 0x1000u + s * 7919u);
+    if (s == 1u) {
+        r->src = VB_SRC_ANLG;
+        r->play.mode = VB_PLAY_SEQ;
+    } else if (s == 2u) {
+        r->src = VB_SRC_DRUM;
+        r->play.mode = VB_PLAY_SEQ;
+        for (i = 0; i < VB_SEQ_STEPS; i++) {                       /* kick, snare, hats */
+            r->play.seq[i].on = 1;
+            r->play.seq[i].note = (uint8_t)(48 + (i % 4 == 0 ? 0 : i % 8 == 4 ? 1 : 3));
+        }
+        r->play.rate = 2;
+    }
+}
+/* bank sound s in RAM: its slot, loaded from flash (or new) into the slot no track uses for longest; a changed sound
+ * is saved before its slot is reused */
+static vb_recipe_t *snd(uint32_t s)
+{
+    int i = snd_find(s), v = -1, k;
+    uint32_t t;
+    if (i >= 0) {
+        vb_slot_used[i] = ++vb_slot_clock;
+        return &vb_slot[i];
+    }
+    for (k = 0; k < (int)VB_SLOTS; k++) {
+        int busy = 0;
+        if (vb_slot_snd[k] == 0xFFu) {
+            v = k;
+            break;
+        }
+        for (t = 0; t < VB_TRACKS; t++)
+            busy |= vb_track_sound[t] == vb_slot_snd[k];
+        if (!busy && (v < 0 || vb_slot_used[k] < vb_slot_used[v]))
+            v = k;
+    }
+    if (vb_slot_snd[v] != 0xFFu && ((vb_dirty_snd[vb_slot_snd[v] >> 5] >> (vb_slot_snd[v] & 31u)) & 1u))
+        vb_save_now();
+    vb_slot_snd[v] = (uint8_t)s;
+    vb_slot_used[v] = ++vb_slot_clock;
+    {
+        int cg = 0;
+        if (!flash_ok || st_read(VB_FL_SOUND(s), vb_sec, VB_SECTOR) || vb_sound_unpack(vb_sec, &vb_slot[v], vb_gen, 0, &cg) < 0)
+            sound_default(s, &vb_slot[v]);
+    }
+    return &vb_slot[v];
+}
+
 static void vb_autosave(void)
 {
     if (vb_st.dirty && !vb_pl.playing && !vb_pl.rec && !ui.printing && (int32_t)(fm1_ms - vb_st.due) >= 0) {
@@ -362,7 +472,8 @@ static void song_save(uint32_t i)
     vb_song.magic = VB_SONG_MAGIC;
     vb_song.bpm10 = (uint16_t)vb_pl.bpm10;
     vb_song.chaos = ui.chaos;
-    vb_song.pad[0] = vb_song.pad[1] = vb_song.pad[2] = 0;
+    vb_song.pad[0] = (uint8_t)(vb_tmute[0] | vb_tmute[1] << 1 | vb_tmute[2] << 2 | vb_tmute[3] << 3);   /* the mutes */
+    vb_song.pad[1] = vb_song.pad[2] = 0;
     for (t = 0; t < VB_TRACKS; t++)
         vb_song.snd[t] = vb_track_sound[t];
     vb_song.crc = song_crc(&vb_song);
@@ -383,8 +494,10 @@ static void song_load(uint32_t i)
         say("EMPTY SONG");
         return;
     }
-    for (t = 0; t < VB_TRACKS; t++)
+    for (t = 0; t < VB_TRACKS; t++) {
         vb_track_sound[t] = vb_song.snd[t] < VB_BANK ? vb_song.snd[t] : (uint8_t)t;
+        vb_tmute[t] = (uint8_t)((vb_song.pad[0] >> t) & 1u);
+    }
     vb_pl.bpm10 = vb_song.bpm10 >= 400u && vb_song.bpm10 <= 3000u ? vb_song.bpm10 : 1200;
     ui.chaos = vb_song.chaos <= 100 ? vb_song.chaos : ui.chaos;
     load_track(ui.track);
@@ -416,7 +529,7 @@ static void sound_copy(void)
         say("BANK FULL");
         return;
     }
-    vb_bank[s] = *RC;
+    *snd(s) = *RC;
     vb_dirty_snd[s >> 5] |= 1u << (s & 31u);
     vb_save_now();                                                 /* the original and the copy */
     vb_track_sound[ui.track] = (uint8_t)s;
@@ -433,7 +546,7 @@ static void load_gens(uint32_t sound)
     vb_curgen = 0;
     if (!flash_ok || st_read(VB_FL_SOUND(sound), vb_sec, VB_SECTOR))
         return;
-    n = vb_sound_unpack(vb_sec, &vb_bank[sound], vb_gen, VB_GENS, &cg);
+    n = vb_sound_unpack(vb_sec, &vb_scratch, vb_gen, VB_GENS, &cg);   /* (the recipe in RAM may be newer) */
     if (n > 0) {
         vb_ngen = (uint8_t)n;
         vb_curgen = (uint8_t)cg;
@@ -445,15 +558,6 @@ static void boot_load(void)
     uint32_t s, i;
     if (!flash_ok)
         return;
-    for (s = 0; s < VB_BANK; s++) {
-        int cg;
-        if (st_read(VB_FL_SOUND(s), vb_sec, 16))
-            continue;
-        if (vb_sec[0] != (uint8_t)0x56u || vb_sec[1] != (uint8_t)0x42u)
-            continue;
-        if (!st_read(VB_FL_SOUND(s), vb_sec, VB_SECTOR))
-            vb_sound_unpack(vb_sec, &vb_bank[s], vb_gen, VB_GENS, &cg);
-    }
     if (!st_read(VB_FL_SET, vb_sec, 64) &&
         ((uint32_t)vb_sec[0] | (uint32_t)vb_sec[1] << 8 | (uint32_t)vb_sec[2] << 16 | (uint32_t)vb_sec[3] << 24) == VB_SET_MAGIC &&
         vb_crc16(vb_sec + 8, 24) == ((uint32_t)vb_sec[4] | (uint32_t)vb_sec[5] << 8)) {
@@ -463,16 +567,27 @@ static void boot_load(void)
         ui.chaos = vb_sec[13] <= 100 ? vb_sec[13] : 70;
         s = (uint32_t)vb_sec[14] | (uint32_t)vb_sec[15] << 8;
         vb_pl.bpm10 = s >= 400u && s <= 3000u ? (int)s : 1200;
+        for (i = 0; i < VB_TRACKS; i++)                    /* (0xFF: settings from before the mutes) */
+            vb_tmute[i] = vb_sec[16] == 0xFFu ? 0 : (uint8_t)((vb_sec[16] >> i) & 1u);
     }
 }
 
-/* ---- sound selection */
+/* ---- sound selection: every track's player on its sound; track t selected (its sound on screen, its player with the
+ * buffers and the print). A track whose sound changed starts fresh; the others play on. */
 static void load_track(uint32_t t)
 {
+    uint32_t k;
     ui.track = (uint8_t)t;
-    RC = &vb_bank[vb_track_sound[t]];
-    vb_player_panic(&vb_pl);
-    vb_pl.rc = RC;                                          /* (the player picks up the new recipe next block) */
+    for (k = 0; k < VB_TRACKS; k++) {
+        vb_recipe_t *r = snd(vb_track_sound[k]);
+        if (vb_bound[k] != vb_track_sound[k]) {
+            vb_player_panic(vb_P[k]);
+            vb_bound[k] = vb_track_sound[k];
+        }
+        vb_P[k]->rc = r;                                   /* (the player picks up the new recipe next block) */
+    }
+    RC = vb_P[t]->rc;
+    sel_player(t);
     load_gens(vb_track_sound[t]);
     {
         int g = load_audio(vb_track_sound[t]), k;
@@ -485,20 +600,21 @@ static void load_track(uint32_t t)
 static void vb_init(void)
 {
     uint32_t i;
-    for (i = 0; i < VB_BANK; i++)
-        vb_recipe_default(&vb_bank[i], 0x1000u + i * 7919u);
-    vb_bank[1].src = VB_SRC_ANLG;
-    vb_bank[1].play.mode = VB_PLAY_SEQ;
-    vb_bank[2].src = VB_SRC_DRUM;
-    vb_bank[2].play.mode = VB_PLAY_SEQ;
-    for (i = 0; i < VB_SEQ_STEPS; i++) {                    /* a beat: kick, snare, hats */
-        vb_bank[2].play.seq[i].on = 1;
-        vb_bank[2].play.seq[i].note = (uint8_t)(48 + (i % 4 == 0 ? 0 : i % 8 == 4 ? 1 : 3));
+    for (i = 0; i < VB_SLOTS; i++)
+        vb_slot_snd[i] = 0xFFu;
+    vb_slot_clock = 0;
+    RC = &vb_slot[0];                                       /* (load_track picks the track's sound after boot_load) */
+    sound_default(0, RC);
+    vb_player_init(vb_P[0], RC, vb_fxbuf, vb_print_a, vb_print_b, VB_PRINT_CAP);
+    for (i = 1; i < VB_TRACKS; i++)
+        vb_player_init(vb_P[i], RC, 0, 0, 0, 0);
+    for (i = 0; i < VB_TRACKS; i++) {
+        vb_P[i]->idle = fm1_wdt_feed;
+        vb_tmute[i] = 0;
+        vb_bound[i] = 0xFFu;
     }
-    vb_bank[2].play.rate = 2;
-    RC = &vb_bank[0];
-    vb_player_init(&vb_pl, RC, vb_fxbuf, vb_print_a, vb_print_b, VB_PRINT_CAP);
-    vb_pl.idle = fm1_wdt_feed;
+    vb_sel = vb_sel_to = 0;
+    ui.track = 0;
     ui.chaos = 70;
     ui.learn_src = -1;
     ui.rng = 0x2545F491u;
@@ -510,7 +626,7 @@ static void vb_init(void)
 /* ---- cells: what a knob edits */
 enum { F_NUM, F_LIST, F_S24, F_S64, F_PCT, F_NOTE, F_LEN, F_HALF, F_DEST, F_AMT, F_HZ };
 enum { K_U8, K_ROOT, K_CTYPE, K_CNOTE, K_FXTYPE, K_MOVE, K_DEST, K_AMT, K_BPM, K_CHAOS, K_SOUND, K_GEN, K_DO, K_STEPS, K_VOI,
-       K_BASS, K_SONG };
+       K_BASS, K_SONG, K_MUTE };
 typedef struct {
     const char *label;
     uint8_t kind, fmt;
@@ -562,6 +678,7 @@ static const char *const DO_N[4] = {"LOAD", "EDIT", "RBLD", "COPY"};
 static const char *const SONGDO_N[2] = {"LOAD", "SAVE"};
 static const char *const CACT_N[3] = {"INS", "DUP", "DEL"};
 static const char *const CIN_N[2] = {"NOTES", "DEGREE"};
+static const char *const MUTE_N[2] = {"PLAY", "MUTE"};
 static const char *const SACT_N[4] = {"ON/OFF", "INS", "DUP", "DEL"};
 static const char *const SAMP_LBL[8] = {"START", "LEN", "LOOP", "REV", "PITCH", "FINE", "FADE", "GAIN"};
 static const char *const SAMP_LOOP_N[3] = {"OFF", "FWD", "P-P"};
@@ -731,7 +848,13 @@ static void build_rows(void)
     case PG_GLO:
         cl(0, 0, "BPM", K_BPM, F_NUM, 0, 40, 300, 0, VB_ADDR_NONE, 0);
         cl(0, 1, "CHAOS", K_CHAOS, F_PCT, &ui.chaos, 0, 100, 0, VB_ADDR_NONE, 0);
-        NR = 1;
+        {
+            static const char *const TN[VB_TRACKS] = {"T1", "T2", "T3", "T4"};
+            uint32_t k;
+            for (k = 0; k < VB_TRACKS; k++)
+                cl(1, k, TN[k], K_MUTE, F_LIST, &vb_tmute[k], 0, 1, MUTE_N, VB_ADDR_NONE, 0);
+        }
+        NR = 2;
         break;
     }
     if (ui.row[ui.page] >= NR)
@@ -868,6 +991,7 @@ static void cell_set(const cell_t *x, int v)
     case K_BASS: ch->bass = (uint8_t)v; break;
     case K_VOI: vb_chord_voice(ch, v); break;
     case K_SONG: ui.song = (uint8_t)v; ui.d_vis = ui.d_prm = 1; return;
+    case K_MUTE: *x->p = (uint8_t)v; vb_st.dirty = 1; vb_st.due = fm1_ms + 2500u; ui.d_vis = ui.d_prm = 1; return;
     case K_FXTYPE: {
         vb_fx_slot_t *f = &RC->fx[ui.op & 7u];
         f->type = (uint8_t)v;
@@ -1383,7 +1507,7 @@ static void press(uint32_t b)
     case B_SAVE: goto_page(PG_BANK); break;
     case B_GLO: goto_page(PG_GLO); break;
     case B_PLAY:
-        vb_player_play(&vb_pl, !vb_pl.playing);
+        transport(!vb_pl.playing);
         say(vb_pl.playing ? "STOP" : "PLAY");
         break;
     case B_REC: print_start(); break;
@@ -2281,11 +2405,20 @@ static void vis_glo(void)
     str_cpy(t, "CPU ", sizeof t);
     utoa10(t + 4, vb_dbg.last_us * 100u / 5805u);
     cat(t, "%", sizeof t);
-    md_text(10, 92, &MD_F3, 2, t, C_INK);
+    md_text(10, 84, &MD_F3, 2, t, C_INK);
     str_cpy(t, "CHAOS ", sizeof t);
     utoa10(t + 6, ui.chaos);
     cat(t, "%", sizeof t);
-    md_text(120, 92, &MD_F3, 2, t, C_INK);
+    md_text(120, 84, &MD_F3, 2, t, C_INK);
+    {   /* the tracks: filled while heard, the selected one in a thick frame */
+        uint32_t k;
+        for (k = 0; k < VB_TRACKS; k++) {
+            int32_t x = 10 + (int32_t)k * 56;
+            static const char *const TN[VB_TRACKS] = {"T1", "T2", "T3", "T4"};
+            rbox(x, 106, 50, 16, 4, k == ui.track ? 3 : 1, C_INK, vb_tmute[k] ? C_BG : C_INK);
+            text_c(x, 50, 108, 2, TN[k], vb_tmute[k] ? C_INK : C_BG);
+        }
+    }
 }
 
 static void draw_vis(void)

@@ -159,7 +159,7 @@ int main(void)
         sel();
         CHECK(vb_track_sound[0] != was && !memcmp(RC, &orig, sizeof orig), "COPY: track 1 on %u (was %u), same recipe",
               vb_track_sound[0], was);
-        CHECK(!memcmp(&vb_bank[was], &orig, sizeof orig), "COPY: the original stays");
+        CHECK(!memcmp(snd(was), &orig, sizeof orig), "COPY: the original stays");
         ui.bank_do = 0;
     }
 
@@ -187,7 +187,24 @@ int main(void)
     turn(EN_ALGO, -1);
     pass(3000);
     boot(0);
-    CHECK(vb_bank[vb_track_sound[1]].play.vel == 33, "track 2's edit after a restart (%u)", vb_bank[vb_track_sound[1]].play.vel);
+    CHECK(snd(vb_track_sound[1])->play.vel == 33, "track 2's edit after a restart (%u)", snd(vb_track_sound[1])->play.vel);
+
+    /* RAM holds a few bank sounds (a cache): an edit survives browsing past 20 others, which reuse its slot */
+    {
+        uint8_t s0 = vb_track_sound[ui.track];
+        int k;
+        RC->play.vel = 77;
+        touch();
+        for (k = 0; k < 20; k++)
+            turn(EN_PRESET, 1);
+        CHECK(vb_track_sound[ui.track] == s0 + 20, "PRESETS +20 (%u)", vb_track_sound[ui.track]);
+        for (k = 0; k < 20; k++)
+            turn(EN_PRESET, -1);
+        CHECK(vb_track_sound[ui.track] == s0 && RC->play.vel == 77, "back on sound %u: VEL %u", vb_track_sound[ui.track],
+              RC->play.vel);
+        RC->play.vel = 100;
+        touch();
+    }
 
     /* CHORD INPUT DEGREE: the keys are a chord pad; on PLAY, stopped, each chord also fills the selected step */
     {
@@ -245,6 +262,47 @@ int main(void)
             vb_player_render(&vb_pl, o, 32);
         }
         RC->cin = 0;
+    }
+
+    /* four tracks at once: PLAY starts all; the selected one holds the FX buffers and the print; MUTE on GLO */
+    {
+        int32_t out[2 * CTL];
+        uint32_t k, b;
+        boot(1);
+        for (k = 0; k < VB_TRACKS; k++)
+            vb_P[k]->peak = 0;
+        snd(vb_track_sound[0])->fx[0].type = VB_FX_REVERB;  /* T1 with a reverb, which needs a buffer */
+        snd(vb_track_sound[0])->fx[0].on = 1;
+        press_b(B_PLAY);
+        for (b = 0; b < 2000u; b++)                        /* 1.5 s */
+            vb_audio_block(out, CTL);
+        for (k = 0; k < VB_TRACKS; k++)
+            CHECK(vb_P[k]->playing, "track %u plays", k + 1);
+        CHECK(vb_P[1]->peak > 1000 && vb_P[2]->peak > 1000, "T2 and T3 sound in the background (%d %d)", vb_P[1]->peak,
+              vb_P[2]->peak);
+        CHECK(vb_P[0]->fx[0].buf && !vb_P[1]->fx[0].buf && vb_P[0]->pbuf[0] && !vb_P[1]->pbuf[0], "T1 holds the buffers");
+        turn(EN_ALGO, 1);                                  /* track 2 selected: the buffers move */
+        for (b = 0; b < 8u; b++)
+            vb_audio_block(out, CTL);
+        CHECK(ui.track == 1 && vb_P[1]->fx[0].buf && !vb_P[0]->fx[0].buf && vb_P[1]->pbuf[0] && !vb_P[0]->pbuf[0],
+              "T2 holds the buffers now");
+        vb_P[0]->peak = 0;
+        for (b = 0; b < 600u; b++)
+            vb_audio_block(out, CTL);
+        CHECK(vb_P[0]->playing && vb_P[0]->peak > 1000, "T1 plays on in the background, its reverb bypassed (%d)",
+              vb_P[0]->peak);
+        press_b(B_GLO);                                    /* GLO, row 2: mute T3 */
+        ui.row[PG_GLO] = 1;
+        turn(EN_K3, 1);
+        CHECK(vb_tmute[2] == 1, "T3 muted");
+        press_b(B_PLAY);
+        for (b = 0; b < 8u; b++)
+            vb_audio_block(out, CTL);
+        CHECK(!vb_P[0]->playing && !vb_P[3]->playing, "STOP stops all");
+        pass(3000);
+        boot(0);
+        CHECK(vb_tmute[2] == 1 && ui.track == 1 && vb_P[1]->fx[0].buf, "after a restart: T3 muted, T2 selected with the buffers");
+        vb_tmute[2] = 0;
     }
 
     printf(failures ? "\n%d FAILED\n" : "\nall ui tests passed\n", failures);

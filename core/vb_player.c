@@ -76,11 +76,12 @@ void vb_player_init(vb_player_t *p, vb_recipe_t *rc, int16_t *fxbuf, int16_t *pr
         vb_lfo_init(&p->lfo[i], rc->seed + 77u * (i + 1u));
     }
     for (i = 0; i < VB_FX_SLOTS; i++)
-        vb_fx_init(&p->fx[i], fxbuf + i * VB_FX_BUF, rc->seed + 1013u * (i + 1u));
+        vb_fx_init(&p->fx[i], fxbuf ? fxbuf + i * VB_FX_BUF : 0, rc->seed + 1013u * (i + 1u));
     p->pbuf[0] = print_a;
     p->pbuf[1] = print_b;
     p->pcap = print_cap > 65535u ? 65535u : print_cap;
-    vb_samp_set_buffer(print_a, 0);
+    if (print_a)
+        vb_samp_set_buffer(print_a, 0);
     p->vol_q8 = 100 * 256;
     voices_reset(p);
 }
@@ -489,7 +490,7 @@ static void canonical(vb_player_t *p)
     for (i = 0; i < VB_FX_SLOTS; i++) {
         int16_t *b = p->fx[i].buf;
         uint32_t k;
-        for (k = 0; k < VB_FX_BUF; k++)
+        for (k = 0; b && k < VB_FX_BUF; k++)
             b[k] = 0;
         vb_fx_init(&p->fx[i], b, rc->seed + 1013u * (i + 1u));
     }
@@ -599,6 +600,34 @@ void vb_player_load(vb_player_t *p, uint32_t len)
     cmd_push(p, CMD(C_SWAP, 0, 0));
 }
 
+/* ---- the buffers move between players (the selected track has them); call with the audio stopped for both */
+void vb_player_give(vb_player_t *from, vb_player_t *to)
+{
+    uint32_t i, k;
+    for (i = 0; i < VB_FX_SLOTS; i++) {
+        int16_t *b = from->fx[i].buf;
+        for (k = 0; b && k < VB_FX_BUF; k++)
+            b[k] = 0;
+        vb_fx_init(&to->fx[i], b, to->rc->seed + 1013u * (i + 1u));
+        vb_fx_init(&from->fx[i], 0, from->rc->seed + 1013u * (i + 1u));
+    }
+    to->pbuf[0] = from->pbuf[0];
+    to->pbuf[1] = from->pbuf[1];
+    to->plen[0] = from->plen[0];
+    to->plen[1] = from->plen[1];
+    to->pcap = from->pcap;
+    to->cur = from->cur;
+    from->pbuf[0] = from->pbuf[1] = 0;
+    from->plen[0] = from->plen[1] = 0;
+    from->rec = 0;
+    if (to->pbuf[0])
+        vb_samp_set_buffer(to->pbuf[to->cur], to->plen[to->cur]);
+    if (to->eng == &vb_samp || to->eng == &vb_gran || to->eng == &vb_chop)
+        voices_reset(to);
+    if (from->eng == &vb_samp || from->eng == &vb_gran || from->eng == &vb_chop)
+        voices_reset(from);
+}
+
 /* ---- the block */
 static void commands(vb_player_t *p)
 {
@@ -661,7 +690,9 @@ void vb_player_render(vb_player_t *p, int32_t *out, int n)
     ev_run(p, p->now + (uint32_t)n);
     for (i = 0; i < n; i++)
         blk[i] = 0;
-    if (p->eng) {
+    if (p->eng && !p->pbuf[0] && (p->eng == &vb_samp || p->eng == &vb_gran || p->eng == &vb_chop)) {
+        /* a sampler source without the print buffers (a track in the background): silent */
+    } else if (p->eng) {
         for (v = 0; v < VB_POLY; v++)
             if (p->vlive[v])
                 p->vlive[v] = (uint8_t)p->eng->render(p->vmem[v], p->eff, blk, n);

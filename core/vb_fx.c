@@ -714,8 +714,15 @@ static void reset(vb_fx_state_t *s, uint8_t type)
     for (int i = 0; i < 4; i++)
         s->ph[i] = 0;
     s->z[11] = MIX_UNSET;
-    for (int i = 0; i < VB_FX_BUF; i++)
-        s->buf[i] = 0;
+    if (s->buf)
+        for (int i = 0; i < VB_FX_BUF; i++)
+            s->buf[i] = 0;
+}
+
+int vb_fx_needs_buf(int type)
+{
+    return type == VB_FX_TAPE || type == VB_FX_REVERB || type == VB_FX_CHORUS || type == VB_FX_RESON ||
+           type == VB_FX_FREEZE || type == VB_FX_SHIFT;
 }
 
 void vb_fx_init(vb_fx_state_t *s, int16_t *buf, uint32_t seed)
@@ -801,8 +808,8 @@ void vb_fx_process(vb_fx_state_t *s, const vb_fx_slot_t *slot, int32_t *io, int 
     uint8_t type = slot->type < VB_FX_TYPES ? slot->type : VB_FX_NONE;
     if (type != s->type)
         reset(s, type);
-    if (!slot->on || s->type == VB_FX_NONE)
-        return;
+    if (!slot->on || s->type == VB_FX_NONE || (!s->buf && vb_fx_needs_buf(s->type)))
+        return;                                          /* (no buffer: a track in the background, the slot bypassed) */
     for (int i = 0; i < n; i += FX_CH)
         chunk(s, slot, io + i, n - i < FX_CH ? n - i : FX_CH, note, bpm10);
 }
