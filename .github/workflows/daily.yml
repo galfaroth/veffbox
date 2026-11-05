@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# Once a day: when staging has new commits and its CI run is green, main moves to staging, the version gets a tag
-# (VERSION.txt, or the next patch number if that one is released already) and release.yml builds the release.
+# Once a day, ONE finished feature from staging to main (tools/daily_release.sh): a feature ends with the commit that
+# changes VERSION.txt. main moves to the oldest one waiting, it gets its tag and release.yml builds the release.
 # 09:00 UTC is 10:00 in Poland in winter (CET) and 11:00 in summer (CEST).
 name: daily release
 on:
@@ -23,4 +23,7 @@ jobs:
         with:
           ref: staging
           fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: bash tools/daily_release.sh
