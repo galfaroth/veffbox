@@ -47,6 +47,9 @@ The order agreed before:
 
 ## Done
 
+- 0.11.1: flash reads in 64-byte IRQ-off windows and the stored print's header first on a track change (less in the
+  audio's way with four tracks); the late counter skips the half an autosave's erase silences on purpose (on the FM-1
+  every save while stopped counted one); stats report the track, mutes, CHORDS, SYNC, MIDI and KEYS NEXT.
 - 0.11.0: KEYS NEXT on PLAY (SEQ, CHORD, ARP; per track, in the settings): any key plays the next step, held as long as
   the key; the sequencer leaves that track to the keys.
 - 0.10.0: SNAP (NOTE, SEQ: OFF, CHORD, SCALE): the keys and the sequence's notes moved to the nearest tone of the chord
