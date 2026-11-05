@@ -8,12 +8,13 @@ as notes, a sequence or a strummed chord sequence, modulate anything with 6 LFOs
 Every resample keeps its recipe, so each of the 64 bank sounds has a generation tree you can branch
 from or rebuild bit-exactly.
 
-**Status:** firmware 0.8.0 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
+**Status:** firmware 0.9.0 runs on the FM-1 (identity `FM-1_62000100`, USB name `FM-1 VEFFBOX`): all six sources,
 chord sequences (16 chords of up to 8 notes, a BASS tone, voicings), chords by degree from the keys (KEY, SCALE, a
 chord pad with modifiers), songs, modulation, the FX chain, RESAMPLE, the 64-sound bank with generations in flash, and bit-exact REBUILD.
 All four tracks sound at once (the track in focus holds the resample and the buffered effects; the others up to 5
 voices each, MUTE on GLO); one chord progression for every track or each its own (CHORDS on GLO); MIDI clock over USB, out or in (SYNC on GLO); a library of
-15 sources and 10 FX chains (LIB on SRC and FX).
+15 sources and 10 FX chains (LIB on SRC and FX); an arpeggiator that follows the chord (MODE ARP); every track's
+notes out over USB MIDI.
 Not yet: PITCH as a modulation target, resamples longer than 1.67 s.
 
 ## Build, install, test on the hardware

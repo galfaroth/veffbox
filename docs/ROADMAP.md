@@ -12,8 +12,7 @@ The features asked for on 2026-11-05, one release each (docs/RELEASING.md), in t
 3. ~~Chords per track or global~~: done in 0.6.0.
 4. ~~Play in sync~~: done in 0.7.0.
 5. ~~A built-in library~~: done in 0.8.0.
-6. **Magic arp**: an arpeggiator that follows the chord playing (the step, or the pad), with the number of octaves;
-   also out over MIDI.
+6. ~~Magic arp~~: done in 0.9.0.
 7. **Notes and melodies that land on the chord**: with a global progression, what you play (and the melodies you
    enter, with the number of octaves, RANDOMIZE in groups of three or four) lands on the tones of the chord playing.
 8. **A planned sequence, played by any keys**: plan the notes / chords first; then any key you press plays the next
@@ -50,6 +49,9 @@ The order agreed before:
 
 ## Done
 
+- 0.9.0: MODE ARP: the chord playing (own progression or CHORDS'), or the keys / pad chord held, UP DOWN UP-DN RND
+  ORDER, 1-4 octaves, 1/16 1/8 1/4 1/32; held keys run it while stopped. MIDI on GLO: every track's notes out over USB
+  (track n on channel n). host/test_arp.c.
 - 0.8.0: the library (core/vb_lib.c): 15 sources (LATEX, RUBBER BS, GLASS, METAL HIT, FM BELL, WOOD, BUZZ BASS,
   SUPERSAW, PLASTIC, SUB BOOM, SYNC LEAD, BLIP, three kits) and 10 FX chains; LIB, the last row of SRC and a row of FX,
   applies as you turn, hold SEL undoes the browsing. host/test_lib.c: every entry sounds, in range, bounded.
