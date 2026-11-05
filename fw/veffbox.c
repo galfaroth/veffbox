@@ -51,7 +51,7 @@ static int st_read(uint32_t off, void *dst, uint32_t n)
 {
     uint8_t *d = dst;
     while (n) {
-        uint32_t k = n > 256u ? 256u : n, f = irq_save();
+        uint32_t k = n > 64u ? 64u : n, f = irq_save();   /* short IRQ-off windows: four tracks leave less room */
         int rc = FL_FAR(fl_read_ram)(off, d, k);
         irq_restore(f);
         if (rc)

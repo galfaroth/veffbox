@@ -384,10 +384,10 @@ static int load_audio(uint32_t sound)                              /* the stored
     uint32_t len, done, sec, n, gen;
     int16_t *dst = vb_pl.pbuf[vb_pl.cur ^ 1u];
     vb_adpcm_t st = {0, 0};
-    if (!flash_ok || st_read(VB_FL_AUDIO, vb_sec, VB_SECTOR))
+    if (!flash_ok || st_read(VB_FL_AUDIO, vb_sec, 16))            /* the header first: most often not this sound's */
         return -1;
     if (((uint32_t)vb_sec[0] | (uint32_t)vb_sec[1] << 8 | (uint32_t)vb_sec[2] << 16 | (uint32_t)vb_sec[3] << 24) !=
-        VB_AUDIO_MAGIC || vb_sec[4] != sound)
+        VB_AUDIO_MAGIC || vb_sec[4] != sound || st_read(VB_FL_AUDIO, vb_sec, VB_SECTOR))
         return -1;
     len = (uint32_t)vb_sec[6] | (uint32_t)vb_sec[7] << 8;
     gen = vb_sec[5];
