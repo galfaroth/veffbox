@@ -12,6 +12,11 @@ if ! git merge-base --is-ancestor origin/main origin/staging; then
     echo "main has commits that staging lacks: merge main into staging first"
     exit 1
 fi
+last="$(git for-each-ref --sort=-creatordate --count=1 --format='%(creatordate:unix)' 'refs/tags/v*')"
+if [ -n "$last" ] && [ $(( $(date +%s) - last )) -lt $(( 20 * 3600 )) ]; then
+    echo "a release went out less than 20 hours ago (a run by hand, or a late schedule): no second one today"
+    exit 0
+fi
 F=""
 for c in $(git rev-list --reverse --first-parent origin/main..origin/staging); do
     if ! git diff --quiet "$c^" "$c" -- VERSION.txt; then
