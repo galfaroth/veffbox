@@ -75,3 +75,5 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, budgets and mil
 ## License
 
 GPL-3.0-only. Veffbox builds on [MNM-1](https://github.com/galfaroth/mnm1).
+
+You can also try Veffbox in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
